@@ -142,9 +142,9 @@ opcode as noted.
                                                               For line jumps we store a u16 line after `THEN`.
                                                               NOT used for conditional statements.
 
-  45            `GOTO`                     `G.` ✔             Jumps by **linear scan**. Takes **expression** (not fixed line).
+  45            `GOTO`                     `G.` ✔             Jumps by **linear scan**. Takes **expression**, **string literal label**, or **string variable** as target.
 
-  46            `GOSUB`                  `GOS.` ✔             Push return PC to static stack; jump by scan. Takes **expression**.
+  46            `GOSUB`                  `GOS.` ✔             Push return PC to static stack; jump by scan. Takes **expression**, **string literal label**, or **string variable** as target.
 
   47            `RETURN`                  `RE.` ✔             Pops; error if empty.
 
@@ -305,6 +305,49 @@ FOR I=1 TO 5 STEP 0   ← ERROR: STEP cannot be zero
 NEXT I
 
 NEXT K                ← ERROR: NEXT without matching FOR
+```
+
+### 5.3) GOTO/GOSUB Label System (PC-1211 Enhanced)
+
+The PC-1211 interpreter supports comprehensive label functionality for structured programming:
+
+**String Literal Labels:**
+```basic
+10 "MAIN" PRINT "Starting program"
+20 GOTO "LOOP"
+30 "EXIT" END
+100 "LOOP" A=A+1: IF A<10 GOTO "LOOP": GOTO "EXIT"
+```
+
+**Computed Labels (String Variables):**
+```basic
+10 TARGET$="FINISH"
+20 RESULT$="SUCCESS"
+30 IF A>0 GOTO TARGET$  ← Jump to label stored in variable
+40 GOSUB RESULT$        ← Call subroutine with computed label
+```
+
+**Mixed Label/Line Number Usage:**
+```basic
+10 GOTO 100             ← Traditional line number
+20 GOTO "PROCESS"       ← String literal label  
+30 A$="END": GOTO A$    ← Computed label
+100 "PROCESS" PRINT "Processing..."
+200 "END" STOP
+```
+
+**Label Rules:**
+- Labels are **case-insensitive** (`"main"` = `"MAIN"`)
+- Maximum **7 characters** (truncated if longer)
+- Runtime **label→line mapping** with linear search
+- **Type checking**: String variables must contain string data
+- **Error 2**: Bad line number (label not found)
+- **Error 5**: Type mismatch (non-string in string variable)
+
+**Expression Support:**
+```basic
+10 A=50: GOTO A*2       ← Expression: jumps to line 100
+20 B=200: GOSUB B+50    ← Expression: calls line 250
 ```
 
 ------------------------------------------------------------------------

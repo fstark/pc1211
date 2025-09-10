@@ -93,7 +93,8 @@ enum
     FOR_MAX = 64,          /* FOR loop nesting depth */
     EXPR_VAL_MAX = 64,     /* Expression evaluation stack */
     TOKBUF_LINE_MAX = 256, /* Maximum tokens per line */
-    LINE_NUM_MAX = 999     /* Maximum line number (1-999) */
+    LINE_NUM_MAX = 999,    /* Maximum line number (1-999) */
+    LABELS_MAX = 100       /* Maximum number of labels */
 };
 
 /* Error codes */

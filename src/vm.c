@@ -700,6 +700,14 @@ void vm_execute_statement(void)
 
     switch (token)
     {
+    case T_STR: /* Label - skip it */
+    {
+        uint8_t str_len = *g_vm.pc++;
+        g_vm.pc += str_len; /* Skip the string data */
+        /* Label is now skipped, continue with next token */
+        break;
+    }
+
     case T_VAR: /* Direct assignment: A = expr */
     {
         uint8_t var_idx = *g_vm.pc++;
@@ -1065,19 +1073,71 @@ void vm_execute_statement(void)
 
     case T_GOTO:
     {
-        /* Find end of expression properly by skipping tokens */
-        uint8_t *line_end = g_vm.pc;
-        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
-            line_end = token_skip(line_end);
-            if (!line_end) break;
-        }
+        uint16_t target_line = 0;
         
-        double line_num = parse_expression(&g_vm.pc, line_end);
-        if (error_get_code() != ERR_NONE)
-            return;
+        /* Check if next token is a string label (literal or variable) */
+        if (*g_vm.pc == T_STR)
+        {
+            /* String literal label */
+            g_vm.pc++; /* Skip T_STR */
+            uint8_t str_len = *g_vm.pc++;
+            if (str_len > STR_MAX) {
+                error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+                return;
+            }
+            char label[STR_MAX + 1];
+            memcpy(label, g_vm.pc, str_len);
+            label[str_len] = '\0';
+            g_vm.pc += str_len;
+            
+            target_line = program_find_label(label);
+            if (target_line == 0)
+            {
+                error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                return;
+            }
+        }
+        else if (*g_vm.pc == T_SVAR)
+        {
+            /* String variable label */
+            g_vm.pc++; /* Skip T_SVAR */
+            uint8_t var_idx = *g_vm.pc++;
+            
+            /* Get string variable value */
+            VarCell *cell = var_get(var_idx);
+            if (!cell)
+                return; /* Error already set by var_get */
+            
+            if (cell->type != VAR_STR)
+            {
+                error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+                return;
+            }
+            
+            target_line = program_find_label(cell->value.str);
+            if (target_line == 0)
+            {
+                error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                return;
+            }
+        }
+        else
+        {
+            /* Parse expression for line number */
+            uint8_t *line_end = g_vm.pc;
+            while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
+                line_end = token_skip(line_end);
+                if (!line_end) break;
+            }
+            
+            double line_num = parse_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+            target_line = (uint16_t)line_num;
+        }
 
         /* Jump to line */
-        uint8_t *target = program_find_line_tokens((int)line_num);
+        uint8_t *target = program_find_line_tokens(target_line);
         if (!target)
         {
             error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
@@ -1085,7 +1145,7 @@ void vm_execute_statement(void)
         }
 
         g_vm.pc = target;
-        g_vm.current_line = (int)line_num;
+        g_vm.current_line = target_line;
         return; /* Don't advance PC normally */
     }
 
@@ -1200,25 +1260,76 @@ void vm_execute_statement(void)
 
     case T_GOSUB:
     {
-        /* Find end of expression properly by skipping tokens */
-        uint8_t *line_end = g_vm.pc;
-        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
-            line_end = token_skip(line_end);
-            if (!line_end) break;
-        }
+        uint16_t target_line = 0;
         
-        /* Evaluate expression to get line number */
-        double line_num = parse_expression(&g_vm.pc, line_end);
-        if (error_get_code() != ERR_NONE)
-            return;
+        /* Check if next token is a string label (literal or variable) */
+        if (*g_vm.pc == T_STR)
+        {
+            /* String literal label */
+            g_vm.pc++; /* Skip T_STR */
+            uint8_t str_len = *g_vm.pc++;
+            if (str_len > STR_MAX) {
+                error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+                return;
+            }
+            char label[STR_MAX + 1];
+            memcpy(label, g_vm.pc, str_len);
+            label[str_len] = '\0';
+            g_vm.pc += str_len;
+            
+            target_line = program_find_label(label);
+            if (target_line == 0)
+            {
+                error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                return;
+            }
+        }
+        else if (*g_vm.pc == T_SVAR)
+        {
+            /* String variable label */
+            g_vm.pc++; /* Skip T_SVAR */
+            uint8_t var_idx = *g_vm.pc++;
+            
+            /* Get string variable value */
+            VarCell *cell = var_get(var_idx);
+            if (!cell)
+                return; /* Error already set by var_get */
+            
+            if (cell->type != VAR_STR)
+            {
+                error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+                return;
+            }
+            
+            target_line = program_find_label(cell->value.str);
+            if (target_line == 0)
+            {
+                error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                return;
+            }
+        }
+        else
+        {
+            /* Parse expression for line number */
+            uint8_t *line_end = g_vm.pc;
+            while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
+                line_end = token_skip(line_end);
+                if (!line_end) break;
+            }
+            
+            double line_num = parse_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+            target_line = (uint16_t)line_num;
+        }
 
-        /* Push return address onto call stack (should be end of expression) */
+        /* Push return address onto call stack */
         vm_push_call(g_vm.pc, g_vm.current_line);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Jump to subroutine */
-        uint8_t *target = program_find_line_tokens((int)line_num);
+        uint8_t *target = program_find_line_tokens(target_line);
         if (!target)
         {
             error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
@@ -1226,7 +1337,7 @@ void vm_execute_statement(void)
         }
 
         g_vm.pc = target;
-        g_vm.current_line = (int)line_num;
+        g_vm.current_line = target_line;
         return; /* Don't advance PC normally */
     }
 

@@ -119,7 +119,60 @@ for indices in 1..VARS_MAX; error if outside range.
 
 **Exit criteria:** Branching and subroutines stable. ✅ **COMPLETED**
 
-**Enhancement (Post-Phase 7):** GOTO/GOSUB now accept **expressions** instead of just literal line numbers. Examples: `GOTO A*10+50`, `GOSUB B+200`.
+## Post-Phase 7 Enhanced GOTO/GOSUB Implementation
+
+The PC-1211 BASIC interpreter now supports comprehensive GOTO/GOSUB functionality that goes beyond the original specification:
+
+### 1. Expression-Based GOTO/GOSUB ✅ **COMPLETED**
+GOTO/GOSUB now accept **expressions** instead of just literal line numbers:
+- `GOTO A*10+50` - Jump to calculated line number
+- `GOSUB B+200` - Call subroutine at calculated line number
+- Full expression support: variables, arithmetic, parentheses
+
+### 2. String Literal Labels ✅ **COMPLETED**  
+Lines can now start with string literals as labels:
+- `"MAIN" PRINT "Hello World"` - Define a label at line start
+- `GOTO "MAIN"` - Jump to string literal label
+- `GOSUB "SUBROUTINE"` - Call subroutine with string literal label
+- Labels are case-insensitive and limited to 7 characters (PC-1211 string limit)
+
+### 3. Computed Labels (String Variables) ✅ **COMPLETED**
+String variables can be used as dynamic label targets:
+- `A$="EXIT": GOTO A$` - Jump to label stored in string variable
+- `B$="SUB1": GOSUB B$` - Call subroutine with label from string variable
+- Full dynamic programming support with string variable evaluation
+
+### 4. Mixed Label/Line Number Support ✅ **COMPLETED**
+Programs can mix traditional line numbers with string labels seamlessly:
+```basic
+10 A$="FINISH"
+20 GOTO 100        ; Traditional line number
+30 PRINT "Never reached"
+100 GOTO "MIDDLE"  ; String literal label  
+200 "MIDDLE" GOSUB A$  ; Computed label from variable
+300 END
+400 "FINISH" PRINT "Done!": RETURN
+```
+
+### 5. Comprehensive Error Handling ✅ **COMPLETED**
+- **Type Mismatch (Error 5)**: When string variable contains non-string data
+- **Bad Line Number (Error 2)**: When label or computed line number doesn't exist
+- **Buffer Overflow Protection**: Labels exceeding 7 characters are truncated
+- **Runtime Validation**: Label existence checked at execution time
+
+### Implementation Details
+- **Label Table**: Dynamic label→line mapping with 100 label capacity
+- **Token Support**: T_STR for string literals, T_SVAR for string variables
+- **Memory Management**: Automatic label table clearing on program load
+- **Performance**: O(n) label lookup with linear search through label table
+
+### Test Coverage
+All functionality verified with comprehensive test suite:
+- Expression GOTO/GOSUB with mathematical operations
+- String literal labels with GOTO/GOSUB targeting
+- Computed labels using string variables
+- Mixed usage scenarios with labels and line numbers
+- Error conditions and boundary cases
 
 ------------------------------------------------------------------------
 

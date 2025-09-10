@@ -22,12 +22,21 @@ typedef struct
     } value;
 } VarCell;
 
+/* Label table entry */
+typedef struct
+{
+    char label[STR_MAX + 1]; /* Label string */
+    uint16_t line_num;       /* Line number where label is defined */
+} LabelEntry;
+
 /* Program memory structure */
 typedef struct
 {
     uint8_t prog[PROG_MAX_BYTES]; /* Token buffer */
     int prog_len;                 /* Current program size */
     VarCell vars[VARS_MAX + 1];   /* Variables 1..VARS_MAX (0 unused) */
+    LabelEntry labels[LABELS_MAX]; /* Label table */
+    int label_count;              /* Number of labels defined */
 } Program;
 
 /* Line record format: u16 len | u16 line | tokens... | T_EOL */
@@ -48,6 +57,11 @@ void program_clear(void);
 /* Line management */
 bool program_add_line(uint16_t line_num, const uint8_t *tokens, int token_len);
 bool program_delete_line(uint16_t line_num);
+
+/* Label management */
+void program_add_label(const char *label, uint16_t line_num);
+uint16_t program_find_label(const char *label);
+void program_clear_labels(void);
 LineRecord *program_find_line(uint16_t line_num);
 LineRecord *program_first_line(void);
 LineRecord *program_next_line(LineRecord *current);

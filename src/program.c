@@ -19,6 +19,7 @@ void program_clear(void)
 {
     g_program.prog_len = 0;
     var_init_all();
+    program_clear_labels();
 }
 
 /* Initialize all variables to NUM=0, STR="" */
@@ -39,7 +40,7 @@ VarCell *var_get(int index)
         error_report(ERR_INDEX_OUT_OF_RANGE, 0);
         return NULL; /* Never reached */
     }
-    return &g_program.vars[index];
+    return &g_program.vars[index - 1];
 }
 
 /* Set variable to numeric value */
@@ -125,6 +126,19 @@ bool program_add_line(uint16_t line_num, const uint8_t *tokens, int token_len)
     *(uint16_t *)(insert_pos + 2) = line_num;
     memcpy(insert_pos + 4, tokens, token_len);
     insert_pos[4 + token_len] = T_EOL;
+
+    /* Check for label at start of line */
+    if (token_len > 0 && tokens[0] == T_STR)
+    {
+        uint8_t str_len = tokens[1];
+        if (str_len <= STR_MAX)
+        {
+            char label[STR_MAX + 1];
+            memcpy(label, tokens + 2, str_len);
+            label[str_len] = '\0';
+            program_add_label(label, line_num);
+        }
+    }
 
     g_program.prog_len += record_len;
     return true;
@@ -401,4 +415,48 @@ uint8_t *program_next_line_tokens(uint8_t *current)
     }
 
     return NULL;
+}
+
+/* Label management functions */
+
+/* Clear all labels */
+void program_clear_labels(void)
+{
+    g_program.label_count = 0;
+}
+
+/* Add a label mapping */
+void program_add_label(const char *label, uint16_t line_num)
+{
+    if (g_program.label_count >= LABELS_MAX)
+        return; /* Silently ignore if table full */
+    
+    /* Check if label already exists and update it */
+    for (int i = 0; i < g_program.label_count; i++)
+    {
+        if (strcmp(g_program.labels[i].label, label) == 0)
+        {
+            g_program.labels[i].line_num = line_num;
+            return;
+        }
+    }
+    
+    /* Add new label */
+    strncpy(g_program.labels[g_program.label_count].label, label, STR_MAX);
+    g_program.labels[g_program.label_count].label[STR_MAX] = '\0';
+    g_program.labels[g_program.label_count].line_num = line_num;
+    g_program.label_count++;
+}
+
+/* Find line number for a label */
+uint16_t program_find_label(const char *label)
+{
+    for (int i = 0; i < g_program.label_count; i++)
+    {
+        if (strcmp(g_program.labels[i].label, label) == 0)
+        {
+            return g_program.labels[i].line_num;
+        }
+    }
+    return 0; /* Label not found */
 }

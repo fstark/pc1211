@@ -34,8 +34,8 @@
 | DEGREE      | DEG.         | Yes                            | Yes             | DEGREE                               | Sets the angle mode to DEG (decimal notation).                                                                                               |
 | END         | E.           | No                             | Yes             | END                                  | Terminates the program execution.                                                                                                            |
 | FOR         | F.           | No                             | Yes             | 10 FOR A=0 TO 10 STEP 2<br>100 NEXT A | Increments by 2 from A=0 to A=10, during which time program lines up to NEXT A are repeated. Repeats the lines 10 through 100 for 6 times as A=0 advances to 2, 4 …… 10. |
-| GOTO        | G.           | No                             | Yes             | 10 GOTO A*10+50                     | Jumps to line number from expression (e.g., if A=5, jumps to line 100).                                                                     |
-| GOSUB       | GOS.         | No                             | Yes             | 10 GOSUB B+200                       | Jumps to subroutine at line from expression (e.g., if B=0, jumps to line 200).                                                              |
+| GOTO        | G.           | No                             | Yes             | 10 GOTO A*10+50<br>20 GOTO "LABEL"<br>30 GOTO A$ | Jumps to line number from expression, string literal label, or computed label from string variable. Supports expressions, string literals, and string variables as targets. |
+| GOSUB       | GOS.         | No                             | Yes             | 10 GOSUB B+200<br>20 GOSUB "SUB1"<br>30 GOSUB B$ | Jumps to subroutine at line from expression, string literal label, or computed label from string variable. Same target types as GOTO but pushes return address. |
 | GRAD        |              | Yes                            | Yes             | GRAD                                 | Sets the angle mode to GRAD.                                                                                                                 |
 | IF          |              | No                             | Yes             | 10 IF A=B                            | Decision instruction, successive statement is executed when the IF statement is statisfied, or executes the next line when the IF statement is not statisfied. |
 | INPUT       | I.           | No                             | Yes             | INPUT A                              | Data input through the keyboard                                                                                                              |
@@ -50,3 +50,41 @@
 | STOP        | S.           | No                             | Yes             | STOP                                  | Suspends program execution.                                                                                                                  |
 | THEN        | T.           | No.                            | Yes             | IF ... THEN 60                       | Written after the IF instruction to indicate jump line number.                                                                               |
 | USING       | U.           | No                             | Yes             | PRINT USING " ### . ##"; A           | Designates the format in relation with PRINT instruction. In this example, A is designated with 3 digits of integer and 2 digits after the decimal point. |
+
+## Labels
+
+PC-1211 BASIC supports string labels for enhanced program organization and dynamic flow control:
+
+### String Literal Labels
+Lines can start with string literals as labels:
+```basic
+10 "MAIN" PRINT "Hello World"
+20 "LOOP" A=A+1: IF A<10 GOTO "LOOP"  
+30 "EXIT" END
+```
+
+### Label Usage with GOTO/GOSUB
+- **String Literals**: `GOTO "MAIN"`, `GOSUB "SUBROUTINE"`
+- **String Variables**: `A$="EXIT": GOTO A$`, `B$="SUB1": GOSUB B$`
+- **Expressions**: `GOTO A*10+50` (traditional line number calculation)
+
+### Label Rules
+- Labels are **case-insensitive** (`"main"` = `"MAIN"` = `"Main"`)
+- Maximum **7 characters** (PC-1211 string limit)
+- Labels exceeding 7 characters are automatically truncated
+- Labels and line numbers can be **mixed freely** in the same program
+- Label existence is checked at **runtime**, not compile time
+
+### Examples
+```basic
+10 A$="FINISH"          ; Set target label
+20 PRINT "Starting..."
+30 GOTO "PROCESS"       ; Jump to string literal label
+40 PRINT "Never reached"
+
+100 "PROCESS" PRINT "Processing..."
+110 GOSUB A$           ; Jump to computed label
+120 END
+
+200 "FINISH" PRINT "Done!": RETURN
+```
