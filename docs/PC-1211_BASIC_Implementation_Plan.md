@@ -54,9 +54,10 @@ yet.
 -   **Line numbers**: Range 1-999; duplicate lines replace previous.
 -   **Line insertion**: O(n²) insertion maintaining memory order (authentic behavior).
 -   Encode **statements**:
-    -   `LET` optional except immediately after `IF` if you want the
-        quirk; otherwise always optional.
-    -   `IF … THEN <line|one-statement>` (store line as `u16`).
+    -   `LET` optional for assignments, but required for conditional
+        assignments: `IF A=3 LET B=42` (not `IF A=3 THEN LET B=42`).
+    -   **PC-1211 IF syntax**: `IF condition THEN line_number` or 
+        `IF condition statement` (store line as `u16` after THEN).
     -   `GOTO`, `GOSUB`, `RETURN`, `END`, `STOP`, `REM` (store comment text), `FOR/TO/STEP`,
         `NEXT`, `PRINT`, `INPUT` (parse as BASIC expression).
 -   Reject/ignore (for now): `DEGREE/RADIAN/GRAD`, `CLEAR`, `BEEP`,
@@ -107,16 +108,16 @@ for indices in 1..VARS_MAX; error if outside range.
     -   **Numeric comparisons**: All operators work.
     -   **String comparisons**: Only `=` and `<>` allowed.
     -   **Mixed comparisons**: Type 1 error (no coercion).
--   `IF … THEN <line>` jump; `IF … THEN <one-statement>` execute inline
-    then continue.
+-   **PC-1211 IF syntax**: `IF condition THEN line_number` (conditional GOTO)
+    or `IF condition statement` (conditional execution, no THEN keyword).
 -   `GOSUB`/`RETURN` with **fixed-depth** static stack (errors on
     under/overflow).
 
-**Tests:** - `IF` jumping to a line; `IF` executing a single embedded
-statement. - Nested GOSUB (depth \>1), error on `RETURN` without
-`GOSUB`.
+**Tests:** - `IF condition THEN line_number` (conditional GOTO); 
+`IF condition statement` (conditional execution, no THEN). 
+- Nested GOSUB (depth >1), error on `RETURN` without `GOSUB`.
 
-**Exit criteria:** Branching and subroutines stable.
+**Exit criteria:** Branching and subroutines stable. ✅ **COMPLETED**
 
 ------------------------------------------------------------------------
 

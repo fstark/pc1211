@@ -15,6 +15,7 @@ void vm_init(void)
     g_vm.current_line = 0;
     g_vm.running = false;
     g_vm.expr_stack.top = 0;
+    g_vm.call_stack.top = 0;
 }
 
 /* Push value onto expression stack */
@@ -37,6 +38,33 @@ double vm_pop_value(void)
         return 0.0;
     }
     return g_vm.expr_stack.values[--g_vm.expr_stack.top];
+}
+
+/* Push call frame onto call stack */
+void vm_push_call(uint8_t *return_pc, int return_line)
+{
+    if (g_vm.call_stack.top >= CALL_STACK_SIZE)
+    {
+        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
+        return;
+    }
+    g_vm.call_stack.frames[g_vm.call_stack.top].return_pc = return_pc;
+    g_vm.call_stack.frames[g_vm.call_stack.top].return_line = return_line;
+    g_vm.call_stack.top++;
+}
+
+/* Pop call frame from call stack */
+bool vm_pop_call(uint8_t **return_pc, int *return_line)
+{
+    if (g_vm.call_stack.top <= 0)
+    {
+        error_set(ERR_RETURN_WITHOUT_GOSUB, g_vm.current_line);
+        return false;
+    }
+    g_vm.call_stack.top--;
+    *return_pc = g_vm.call_stack.frames[g_vm.call_stack.top].return_pc;
+    *return_line = g_vm.call_stack.frames[g_vm.call_stack.top].return_line;
+    return true;
 }
 
 /* Forward declarations for expression parsing */
@@ -228,6 +256,53 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
     default:
         error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
         return 0.0;
+    }
+}
+
+/* Evaluate condition for IF statement */
+bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
+{
+    /* Parse left side of comparison */
+    double left_val = vm_eval_expression(pc_ptr, end);
+
+    if (error_get_code() != ERR_NONE)
+        return false;
+
+    /* Get comparison operator */
+    if (*pc_ptr >= end)
+    {
+        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        return false;
+    }
+
+    uint8_t op = **pc_ptr;
+    (*pc_ptr)++;
+
+    /* Parse right side of comparison */
+    double right_val = vm_eval_expression(pc_ptr, end);
+
+    if (error_get_code() != ERR_NONE)
+        return false;
+
+    /* Perform comparison */
+    switch (op)
+    {
+    case T_EQ:
+    case T_EQ_ASSIGN: /* Allow = as comparison in IF statements */
+        return left_val == right_val;
+    case T_NE:
+        return left_val != right_val;
+    case T_LT:
+        return left_val < right_val;
+    case T_LE:
+        return left_val <= right_val;
+    case T_GT:
+        return left_val > right_val;
+    case T_GE:
+        return left_val >= right_val;
+    default:
+        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        return false;
     }
 }
 
@@ -449,6 +524,159 @@ void vm_execute_statement(void)
 
         g_vm.pc = target;
         g_vm.current_line = (int)line_num;
+        return; /* Don't advance PC normally */
+    }
+
+    case T_IF:
+    {
+        /* IF condition [THEN line_number | statement] */
+        uint8_t *line_end = program_find_line_end(g_vm.pc);
+
+        /* Look for THEN token to determine IF type */
+        uint8_t *then_pos = g_vm.pc;
+        bool has_then = false;
+        while (then_pos < line_end && *then_pos != T_THEN && *then_pos != T_EOL)
+        {
+            then_pos = token_skip(then_pos);
+            if (!then_pos)
+                break;
+        }
+
+        if (then_pos < line_end && *then_pos == T_THEN)
+        {
+            has_then = true;
+        }
+
+        if (has_then)
+        {
+            /* IF condition THEN line_number */
+            bool condition = vm_eval_condition(&g_vm.pc, then_pos);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip to THEN */
+            g_vm.pc = then_pos + 1;
+
+            if (condition)
+            {
+                /* Must be followed by line number */
+                if (*g_vm.pc != T_NUM)
+                {
+                    error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+                    return;
+                }
+                g_vm.pc++;
+                double line_num = *(double *)g_vm.pc;
+                g_vm.pc += sizeof(double);
+
+                uint8_t *target = program_find_line_tokens((int)line_num);
+                if (!target)
+                {
+                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                    return;
+                }
+
+                g_vm.pc = target;
+                g_vm.current_line = (int)line_num;
+                return; /* Don't advance PC normally */
+            }
+            else
+            {
+                /* Condition false - skip to end of line */
+                g_vm.pc = line_end;
+            }
+        }
+        else
+        {
+            /* IF condition statement (no THEN) */
+            /* Parse: IF expression comparison_op expression statement */
+
+            uint8_t *saved_pc = g_vm.pc;
+
+            /* Parse first expression */
+            vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip comparison operator */
+            if (g_vm.pc < line_end && (*g_vm.pc == T_EQ || *g_vm.pc == T_EQ_ASSIGN || *g_vm.pc == T_NE ||
+                                       *g_vm.pc == T_LT || *g_vm.pc == T_LE ||
+                                       *g_vm.pc == T_GT || *g_vm.pc == T_GE))
+            {
+                g_vm.pc++;
+            }
+
+            /* Parse second expression */
+            vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Now g_vm.pc should be at the statement */
+            uint8_t *statement_pos = g_vm.pc;
+
+            /* Reset PC and evaluate condition properly */
+            g_vm.pc = saved_pc;
+            error_clear(); /* Clear any errors from the parsing above */
+
+            bool condition = vm_eval_condition(&g_vm.pc, statement_pos);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            if (condition)
+            {
+                /* Execute the statement - PC should be at statement token */
+                /* Statement will be executed in next iteration */
+            }
+            else
+            {
+                /* Condition false - skip to end of line */
+                g_vm.pc = line_end;
+            }
+        }
+        break;
+    }
+
+    case T_GOSUB:
+    {
+        if (*g_vm.pc != T_NUM)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++;
+        double line_num = *(double *)g_vm.pc;
+        g_vm.pc += sizeof(double);
+
+        /* Push return address onto call stack */
+        vm_push_call(g_vm.pc, g_vm.current_line);
+        if (error_get_code() != ERR_NONE)
+            return;
+
+        /* Jump to subroutine */
+        uint8_t *target = program_find_line_tokens((int)line_num);
+        if (!target)
+        {
+            error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+            return;
+        }
+
+        g_vm.pc = target;
+        g_vm.current_line = (int)line_num;
+        return; /* Don't advance PC normally */
+    }
+
+    case T_RETURN:
+    {
+        /* Pop return address from call stack */
+        uint8_t *return_pc;
+        int return_line;
+        if (!vm_pop_call(&return_pc, &return_line))
+        {
+            return; /* Error already set */
+        }
+
+        g_vm.pc = return_pc;
+        g_vm.current_line = return_line;
         return; /* Don't advance PC normally */
     }
 

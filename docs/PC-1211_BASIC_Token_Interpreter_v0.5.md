@@ -133,11 +133,14 @@ opcode as noted.
   42            `INPUT`                    `I.` ✔ (basic)     Reads `"quoted"` as string (truncate to 7),
                                                               else double. Targets: `VAR`/`VIDX`.
 
-  43            `IF`                        --- ✔             `IF <expr rel expr> THEN <line | one_stmt>`.
+  43            `IF`                        --- ✔             PC-1211 syntax: `IF condition THEN line_number`
+                                                              (conditional GOTO) or `IF condition statement`
+                                                              (conditional execution, no THEN keyword).
                                                               Rel ops use tokens above.
 
-  44            `THEN`                     `T.` (part of IF)  Only after `IF`. For line jumps we store a u16
-                                                              line after `THEN`.
+  44            `THEN`                     `T.` (part of IF)  Only for conditional GOTO: `IF condition THEN line`.
+                                                              For line jumps we store a u16 line after `THEN`.
+                                                              NOT used for conditional statements.
 
   45            `GOTO`                     `G.` ✔             Jumps by **linear scan** for `u16 line`.
 
@@ -224,11 +227,34 @@ opcode as noted.
 -   `LOG` is **common log** (base-10); `LN` is natural.
 -   `DMS`/`DEG` are **functions** (convert number), distinct from
     `DEGREE`/`RADIAN/GRAD` **commands**.
--   `LET` required **immediately after `IF`** if you choose to mirror
-    that syntactic quirk; otherwise allow omitted `LET` everywhere
-    (simpler).
+-   **PC-1211 IF syntax clarification**: `IF condition statement` syntax
+    does NOT use THEN. For assignments in conditional statements, LET
+    is required: `IF A=3 THEN LET B=42` is invalid; use 
+    `IF A=3 LET B=42`. THEN is only for conditional GOTO:
+    `IF A=3 THEN 100`.
 -   `A(n)`: only `A` supports `(...)` to index cells 1..VARS_MAX. (This
     is your rule; card doesn't contradict.)
+
+### 5.1) IF Statement Syntax Examples (PC-1211 specific)
+
+**Conditional GOTO (uses THEN):**
+```basic
+IF A=3 THEN 100        ← Jump to line 100 if A equals 3
+IF B<5 THEN 200        ← Jump to line 200 if B less than 5
+```
+
+**Conditional Statement Execution (NO THEN):**
+```basic
+IF A=3 PRINT "YES"     ← Print if A equals 3
+IF B<5 LET C=10        ← Assign C=10 if B less than 5
+IF X>0 GOSUB 500       ← Call subroutine if X positive
+```
+
+**INVALID syntax (mixing THEN with statements):**
+```basic
+IF A=3 THEN PRINT "NO" ← WRONG! THEN is only for line numbers
+IF A=3 THEN LET B=42   ← WRONG! Use: IF A=3 LET B=42
+```
 
 ------------------------------------------------------------------------
 
