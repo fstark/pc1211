@@ -192,24 +192,37 @@ domain errors; DMS/DEG conversions work correctly. ✅ **COMPLETED**
 
 ------------------------------------------------------------------------
 
-# Phase 7 --- Mode & device-ish statements (safe stubs)
+# Phase 7 --- Mode & device statements ✅ COMPLETE
 
-**Goal:** Accept tokens and act harmlessly; optional mode
-implementation.
+**Goal:** Full implementation of angle modes and device statements.
 
--   **Minimum**:
-    `DEGREE, RADIAN, GRAD, CLEAR, BEEP, PAUSE, AREAD, USING` tokenize
-    and **no-op** (or error with message "unsupported").
--   **Optional**:
-    -   `CLEAR`: set all NUM=0 and STR empty.
-    -   Angle mode: add global `g_ang` and wrap trig/inverse trig with
-        in/out conversion.
+-   **Angle mode system**: ✅ IMPLEMENTED
+    -   `DEGREE`: Set trig mode so `COS(90) = 0` (90° = π/2 rad = 100 grad).
+    -   `RADIAN`: Set trig mode to radians (default).
+    -   `GRAD`: Set trig mode to gradians (400 grad = 360°).
+    -   Affects 6 trig functions: SIN, COS, TAN, ASN, ACS, ATN.
+    -   Does NOT affect DMS/DEG conversion functions.
+-   **Memory management**: ✅ IMPLEMENTED
+    -   `CLEAR`: Set all variables to 0 (A-Z, A(1)-A(VARS_MAX), clears A$-Z$).
+    -   Does not change angle mode or program code.
+-   **AREAD statement**: ✅ IMPLEMENTED
+    -   `AREAD variable`: Read previous screen value into variable.
+    -   Supports: `AREAD A`, `AREAD B$`, `AREAD A(5)`, `AREAD B$(3)`.
+    -   Command line: `--aread-value N` (numeric) or `--aread-string S` (string).
+    -   Type conversion: string→numeric, numeric→string as needed.
+    -   Consumed on first use; PRINT/PAUSE clear AREAD to 0.
+-   **Device commands**: ✅ IMPLEMENTED
+    -   `BEEP`: Emit ASCII bell character (^G).
+    -   `PAUSE expr_list`: Like PRINT but waits 100ms after displaying.
+    -   `USING`: No-op (ignored).
 
-**Tests:** - Programs including these statements still run; if mode
-enabled, check trig in DEG/GRAD.
+**Tests:** ✅ All mode/device statements working correctly. Angle conversions
+verified: SIN(90°) = SIN(π/2 rad) = SIN(100 grad) = 1. AREAD handles both
+numeric and string inputs with proper type conversion.
 
-**Exit criteria:** v0.5 tokens won't break execution even if not fully
-emulated.
+**Exit criteria:** ✅ COMPLETE - All mode/device statements functional; angle 
+modes work correctly with trig functions; AREAD supports both string and 
+numeric command-line inputs.
 
 ------------------------------------------------------------------------
 
@@ -361,16 +374,16 @@ stubs (or real) for mode/device statements.
 
 **Deliverable:** Can run non-trivial BASIC programs with loops, conditionals, and subroutines.
 
-### **Work Item 3: Complete Language (Phases 5-7)**
+### **Work Item 3: Complete Language (Phases 5-7)** ✅ COMPLETE
 **Goal:** Full PC-1211 BASIC compatibility  
 
-- **Phase 5**: String handling + INPUT
-- **Phase 6**: Complete function library (math functions)
-- **Phase 7**: Mode commands and device stubs
+- **Phase 5**: String handling + INPUT ✅ COMPLETE
+- **Phase 6**: Complete function library (math functions) ✅ COMPLETE  
+- **Phase 7**: Mode commands and device statements ✅ COMPLETE
 
 **Why group these:** These are "feature completion" phases that don't fundamentally change the VM architecture.
 
-**Deliverable:** Full PC-1211 BASIC v0.5 specification compliance.
+**Deliverable:** ✅ ACHIEVED - Full PC-1211 BASIC v0.5 specification compliance with angle modes, AREAD statement, and all math functions.
 
 ### **Recommended Starting Point: Work Item 1**
 

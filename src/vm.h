@@ -79,7 +79,22 @@ bool vm_find_for_by_var(uint8_t var_idx, int *frame_index);
 /* Statement execution */
 void vm_execute_statement(void);
 
+/* Angle modes for trigonometric functions */
+typedef enum {
+    ANGLE_RADIAN = 0,  /* Default mode */
+    ANGLE_DEGREE = 1,
+    ANGLE_GRAD = 2
+} AngleMode;
+
+/* Angle conversion functions */
+double convert_angle_to_radians(double angle);
+double convert_angle_from_radians(double radians);
+
 /* Global VM state */
 extern VM g_vm;
+extern AngleMode g_angle_mode;
+extern char g_aread_string[8];   /* AREAD string value (up to 7 chars + null) */
+extern double g_aread_value;     /* AREAD numeric value */
+extern bool g_aread_is_string;   /* Whether AREAD value is a string */
 
 #endif /* VM_H */

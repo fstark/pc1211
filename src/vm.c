@@ -6,9 +6,18 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 /* Global VM state */
 VM g_vm;
+AngleMode g_angle_mode = ANGLE_RADIAN;  /* Default to radians */
+char g_aread_string[8] = "";            /* AREAD string value */
+double g_aread_value = 0.0;             /* AREAD numeric value */
+bool g_aread_is_string = false;         /* Whether AREAD value is a string */
 
 /* Initialize VM */
 void vm_init(void)
@@ -114,6 +123,35 @@ bool vm_find_for_by_var(uint8_t var_idx, int *frame_index)
         }
     }
     return false;
+}
+
+/* Angle conversion functions for trigonometric operations */
+double convert_angle_to_radians(double angle)
+{
+    switch (g_angle_mode)
+    {
+    case ANGLE_DEGREE:
+        return angle * (M_PI / 180.0);
+    case ANGLE_GRAD:
+        return angle * (M_PI / 200.0);
+    case ANGLE_RADIAN:
+    default:
+        return angle;
+    }
+}
+
+double convert_angle_from_radians(double radians)
+{
+    switch (g_angle_mode)
+    {
+    case ANGLE_DEGREE:
+        return radians * (180.0 / M_PI);
+    case ANGLE_GRAD:
+        return radians * (200.0 / M_PI);
+    case ANGLE_RADIAN:
+    default:
+        return radians;
+    }
 }
 
 /* Forward declarations for expression parsing */
@@ -314,7 +352,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         double arg = parse_expression(pc_ptr, end);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        return sin(arg);
+        double radians = convert_angle_to_radians(arg);
+        return sin(radians);
     }
 
     case T_COS:
@@ -329,7 +368,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         double arg = parse_expression(pc_ptr, end);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        return cos(arg);
+        double radians = convert_angle_to_radians(arg);
+        return cos(radians);
     }
 
     case T_TAN:
@@ -344,7 +384,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         double arg = parse_expression(pc_ptr, end);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        return tan(arg);
+        double radians = convert_angle_to_radians(arg);
+        return tan(radians);
     }
 
     case T_ASN:
@@ -364,7 +405,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             error_set(ERR_MATH_DOMAIN, g_vm.current_line);
             return 0.0;
         }
-        return asin(arg);
+        double radians = asin(arg);
+        return convert_angle_from_radians(radians);
     }
 
     case T_ACS:
@@ -384,7 +426,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             error_set(ERR_MATH_DOMAIN, g_vm.current_line);
             return 0.0;
         }
-        return acos(arg);
+        double radians = acos(arg);
+        return convert_angle_from_radians(radians);
     }
 
     case T_ATN:
@@ -399,7 +442,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         double arg = parse_expression(pc_ptr, end);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        return atan(arg);
+        double radians = atan(arg);
+        return convert_angle_from_radians(radians);
     }
 
     case T_LOG:
@@ -1012,6 +1056,10 @@ void vm_execute_statement(void)
             }
         }
         printf("\n");
+        /* PRINT clears AREAD after displaying */
+        g_aread_value = 0.0;
+        g_aread_string[0] = '\0';
+        g_aread_is_string = false;
         break;
     }
 
@@ -1637,6 +1685,256 @@ void vm_execute_statement(void)
         }
         break;
     }
+
+    case T_AREAD:
+    {
+        /* AREAD variable - read previous screen value into variable */
+        if (*g_vm.pc == T_VAR)
+        {
+            /* Numeric variable */
+            g_vm.pc++; /* Skip T_VAR */
+            uint8_t var_idx = *g_vm.pc++;
+
+            if (var_idx < 1 || var_idx > 26)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[var_idx - 1];
+            cell->type = VAR_NUM;
+            if (g_aread_is_string)
+            {
+                /* Convert string to number */
+                cell->value.num = atof(g_aread_string);
+            }
+            else
+            {
+                cell->value.num = g_aread_value;
+            }
+            /* Clear AREAD after use */
+            g_aread_value = 0.0;
+            g_aread_string[0] = '\0';
+            g_aread_is_string = false;
+        }
+        else if (*g_vm.pc == T_SVAR)
+        {
+            /* String variable */
+            g_vm.pc++; /* Skip T_SVAR */
+            uint8_t var_idx = *g_vm.pc++;
+
+            if (var_idx < 1 || var_idx > 26)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[var_idx - 1];
+            cell->type = VAR_STR;
+            
+            if (g_aread_is_string)
+            {
+                /* Use string directly */
+                strncpy(cell->value.str, g_aread_string, sizeof(cell->value.str) - 1);
+                cell->value.str[sizeof(cell->value.str) - 1] = '\0';
+            }
+            else
+            {
+                /* Convert numeric value to string */
+                snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_aread_value);
+            }
+            /* Clear AREAD after use */
+            g_aread_value = 0.0;
+            g_aread_string[0] = '\0';
+            g_aread_is_string = false;
+        }
+        else if (*g_vm.pc == T_VIDX)
+        {
+            /* Indexed numeric variable */
+            g_vm.pc++; /* Skip T_VIDX */
+            g_vm.pc++; /* Skip placeholder byte */
+
+            /* Evaluate index expression */
+            uint8_t *line_end = program_find_line_end(g_vm.pc);
+            double index_val = vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip T_ENDX terminator */
+            if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+            {
+                g_vm.pc++;
+            }
+
+            /* Convert to integer index */
+            int index = (int)index_val;
+            if (index < 1 || index > VARS_MAX)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[index - 1];
+            cell->type = VAR_NUM;
+            if (g_aread_is_string)
+            {
+                /* Convert string to number */
+                cell->value.num = atof(g_aread_string);
+            }
+            else
+            {
+                cell->value.num = g_aread_value;
+            }
+            /* Clear AREAD after use */
+            g_aread_value = 0.0;
+            g_aread_string[0] = '\0';
+            g_aread_is_string = false;
+        }
+        else if (*g_vm.pc == T_SVIDX)
+        {
+            /* Indexed string variable */
+            g_vm.pc++; /* Skip T_SVIDX */
+            g_vm.pc++; /* Skip placeholder byte */
+
+            /* Evaluate index expression */
+            uint8_t *line_end = program_find_line_end(g_vm.pc);
+            double index_val = vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip T_ENDX terminator */
+            if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+            {
+                g_vm.pc++;
+            }
+
+            /* Convert to integer index */
+            int index = (int)index_val;
+            if (index < 1 || index > VARS_MAX)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[index - 1];
+            cell->type = VAR_STR;
+            
+            if (g_aread_is_string)
+            {
+                /* Use string directly */
+                strncpy(cell->value.str, g_aread_string, sizeof(cell->value.str) - 1);
+                cell->value.str[sizeof(cell->value.str) - 1] = '\0';
+            }
+            else
+            {
+                /* Convert numeric value to string */
+                snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_aread_value);
+            }
+            /* Clear AREAD after use */
+            g_aread_value = 0.0;
+            g_aread_string[0] = '\0';
+            g_aread_is_string = false;
+        }
+        else
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        break;
+    }
+
+    /* Mode statements */
+    case T_DEGREE:
+        g_angle_mode = ANGLE_DEGREE;
+        break;
+
+    case T_RADIAN:
+        g_angle_mode = ANGLE_RADIAN;
+        break;
+
+    case T_GRAD:
+        g_angle_mode = ANGLE_GRAD;
+        break;
+
+    /* Memory management */
+    case T_CLEAR:
+    {
+        /* Clear all variables A-Z and indexed variables A(1) through A(VARS_MAX) */
+        for (int i = 0; i <= VARS_MAX; i++)
+        {
+            g_program.vars[i].type = VAR_NUM;
+            g_program.vars[i].value.num = 0.0;
+        }
+        break;
+    }
+
+    /* Device commands */
+    case T_BEEP:
+        putchar('\a');  /* ASCII bell character */
+        fflush(stdout);
+        break;
+
+    case T_PAUSE:
+    {
+        /* PAUSE works exactly like PRINT, then waits 100ms */
+        uint8_t *line_end = program_find_line_end(g_vm.pc);
+        
+        /* Print expressions just like PRINT statement */
+        while (g_vm.pc < line_end && *g_vm.pc != T_EOL && *g_vm.pc != T_COLON)
+        {
+            if (*g_vm.pc == T_STR)
+            {
+                g_vm.pc++; /* Skip T_STR token */
+                uint8_t len = *g_vm.pc++;
+                for (int i = 0; i < len; i++)
+                {
+                    putchar(*g_vm.pc++);
+                }
+            }
+            else if (*g_vm.pc == T_COMMA)
+            {
+                printf("\t"); /* Tab for comma separator */
+                g_vm.pc++;
+            }
+            else if (*g_vm.pc == T_SEMI)
+            {
+                /* Semicolon - no extra space */
+                g_vm.pc++;
+            }
+            else
+            {
+                /* Evaluate and print numeric expression */
+                double value = vm_eval_expression(&g_vm.pc, line_end);
+                if (error_get_code() != ERR_NONE)
+                    return;
+                
+                /* Print number with same formatting as PRINT */
+                if (value >= 0)
+                    printf(" %.6g", value);
+                else
+                    printf("%.6g", value);
+            }
+        }
+        
+        printf("\n"); /* Always end with newline like PRINT */
+        fflush(stdout);
+        
+        /* Wait 100ms */
+        #ifdef _WIN32
+            Sleep(100);  /* Windows */
+        #else
+            usleep(100000);  /* Unix: 100,000 microseconds = 100ms */
+        #endif
+        /* PAUSE clears AREAD after displaying */
+        g_aread_value = 0.0;
+        g_aread_string[0] = '\0';
+        g_aread_is_string = false;
+        break;
+    }
+
+    case T_USING:
+        /* No-op for now - just ignore */
+        break;
 
     default:
         error_set(ERR_SYNTAX_ERROR, g_vm.current_line);

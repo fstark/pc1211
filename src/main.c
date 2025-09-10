@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "opcodes.h"
 #include "program.h"
 #include "tokenizer.h"
@@ -13,10 +14,12 @@ void print_usage(const char *program_name)
     printf("PC-1211 BASIC Interpreter v0.5\n");
     printf("Usage: %s <program.bas> [options]\n", program_name);
     printf("Options:\n");
-    printf("  --list    Show program listing\n");
-    printf("  --dump    Show token dump (debug)\n");
-    printf("  --run     Execute program\n");
-    printf("  --help    Show this help\n");
+    printf("  --list           Show program listing\n");
+    printf("  --dump           Show token dump (debug)\n");
+    printf("  --run            Execute program\n");
+    printf("  --aread-value N  Set AREAD numeric value to N (default: 0.0)\n");
+    printf("  --aread-string S Set AREAD string value to S\n");
+    printf("  --help           Show this help\n");
 }
 
 int main(int argc, char *argv[])
@@ -46,6 +49,33 @@ int main(int argc, char *argv[])
         else if (strcmp(argv[i], "--run") == 0)
         {
             run_program = true;
+        }
+        else if (strcmp(argv[i], "--aread-value") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                g_aread_value = atof(argv[++i]);
+                g_aread_is_string = false;
+            }
+            else
+            {
+                fprintf(stderr, "--aread-value requires a numeric argument\n");
+                return 1;
+            }
+        }
+        else if (strcmp(argv[i], "--aread-string") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                strncpy(g_aread_string, argv[++i], sizeof(g_aread_string) - 1);
+                g_aread_string[sizeof(g_aread_string) - 1] = '\0';
+                g_aread_is_string = true;
+            }
+            else
+            {
+                fprintf(stderr, "--aread-string requires a string argument\n");
+                return 1;
+            }
         }
         else if (strcmp(argv[i], "--help") == 0)
         {

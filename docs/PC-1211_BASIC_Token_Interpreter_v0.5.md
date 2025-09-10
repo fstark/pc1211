@@ -173,42 +173,42 @@ opcode as noted.
   ---------------------------------------------------------------------------
   Opcode            Command           Abb.              Our behavior
   ----------------- ----------------- ----------------- ---------------------
-  50                `DEGREE`          `DEG.`            **Stub (no-op)** by
-                                                        default. (Optional:
-                                                        set `angle_mode=DEG`
+  50                `DEGREE`          `DEG.`            ✅ **IMPLEMENTED**:
+                                                        Set `angle_mode=DEG`
                                                         and auto-convert trig
-                                                        in/out.)
+                                                        in/out for 6 functions.
 
-  51                `RADIAN`          `RA.`             **Stub (no-op)** (or
-                                                        set
-                                                        `angle_mode=RAD`).
+  51                `RADIAN`          `RA.`             ✅ **IMPLEMENTED**:
+                                                        Set
+                                                        `angle_mode=RAD`.
 
-  52                `GRAD`            ---               **Stub (no-op)** (or
-                                                        set
-                                                        `angle_mode=GRAD`).
+  52                `GRAD`            ---               ✅ **IMPLEMENTED**:
+                                                        Set
+                                                        `angle_mode=GRAD`.
 
-  53                `CLEAR`           `CL.`             Optional: **clear all
-                                                        cells** (set NUM=0,
-                                                        STR=""). Safe to
-                                                        implement.
+  53                `CLEAR`           `CL.`             ✅ **IMPLEMENTED**:
+                                                        Clear all variable
+                                                        cells (set NUM=0,
+                                                        STR="").
 
-  54                `BEEP`            `B.`              **Ignored** (no
-                                                        hardware).
+  54                `BEEP`            `B.`              ✅ **IMPLEMENTED**:
+                                                        Emit ASCII bell
+                                                        character (^G).
 
-  55                `PAUSE`           `PA.`             Optional: busy-wait
-                                                        using a fixed loop
-                                                        (still static).
-                                                        Default: **ignored**.
+  55                `PAUSE`           `PA.`             ✅ **IMPLEMENTED**:
+                                                        Print expressions +
+                                                        100ms delay using
+                                                        `usleep(100000)`.
 
-  56                `AREAD`           `A.`              **Unsupported**
-                                                        (DEF/display
-                                                        context). Tokenizer
-                                                        can accept and
-                                                        ignore.
+  56                `AREAD`           `A.`              ✅ **IMPLEMENTED**:
+                                                        Statement form
+                                                        `AREAD var` with
+                                                        command-line input
+                                                        support.
 
-  57                `USING`           `U.`              **Unsupported in
-                                                        v0.5**. (Formatting
-                                                        model is non-trivial;
+  57                `USING`           `U.`              ✅ **IMPLEMENTED**:
+                                                        No-op (ignored) for
+                                                        v0.5 compatibility.
                                                         see "Future".)
   ---------------------------------------------------------------------------
 
