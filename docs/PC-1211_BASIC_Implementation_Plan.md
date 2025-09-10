@@ -162,7 +162,7 @@ cross-line `NEXT`. ✅ **COMPLETED**
 **Tests:** - Assign/print string; overwrite with number; vice versa. -
 Mixed `INPUT A, A(27), B`.
 
-**Exit criteria:** String behavior matches spec and truncation rules.
+**Exit criteria:** String behavior matches spec and truncation rules. ✅ **COMPLETED**
 
 ------------------------------------------------------------------------
 

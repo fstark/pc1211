@@ -2,6 +2,8 @@
 #include "program.h"
 #include "errors.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <stdint.h>
 
@@ -251,9 +253,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
     case T_VIDX:
     {
         (*pc_ptr)++; /* Skip T_VIDX */
-        (*pc_ptr)++; /* Skip placeholder byte */
 
-        /* Evaluate index expression */
+        /* Evaluate index expression directly */
         double index_val = vm_eval_expression(pc_ptr, end);
 
         /* Skip T_ENDX terminator */
@@ -397,9 +398,65 @@ void vm_execute_statement(void)
         break;
     }
 
+    case T_SVAR: /* String assignment: A$ = string_expr */
+    {
+        uint8_t var_idx = *g_vm.pc++;
+
+        /* Expect = */
+        if (*g_vm.pc != T_EQ_ASSIGN)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++;
+
+        /* For now, only handle string literals */
+        if (*g_vm.pc != T_STR)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++; /* Skip T_STR */
+
+        uint8_t orig_str_len = *g_vm.pc++;
+        uint8_t copy_len = (orig_str_len > STR_MAX) ? STR_MAX : orig_str_len;
+
+        /* Store in string variable */
+        if (var_idx < 1 || var_idx > 26)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return;
+        }
+
+        VarCell *cell = &g_program.vars[var_idx - 1];
+        cell->type = VAR_STR;
+
+        /* Copy string data, convert to uppercase (up to STR_MAX chars) */
+        int i;
+        for (i = 0; i < copy_len; i++)
+        {
+            char c = *g_vm.pc++;
+            if (c >= 'a' && c <= 'z')
+            {
+                c = c - 'a' + 'A'; /* Convert to uppercase */
+            }
+            cell->value.str[i] = c;
+        }
+        cell->value.str[i] = '\0'; /* Null terminate */
+
+        /* Skip remaining bytes if string was longer than STR_MAX */
+        for (int j = copy_len; j < orig_str_len; j++)
+        {
+            g_vm.pc++;
+        }
+
+        break;
+    }
+
     case T_VIDX: /* Indexed assignment: A(expr) = expr */
     {
-        g_vm.pc++; /* Skip placeholder byte */
+        /* T_VIDX always refers to variable A with indexing */
+        /* No placeholder byte - directly parse the index expression */
 
         /* Evaluate index */
         uint8_t *line_end = program_find_line_end(g_vm.pc);
@@ -434,6 +491,68 @@ void vm_execute_statement(void)
         VarCell *cell = &g_program.vars[index - 1];
         cell->type = VAR_NUM;
         cell->value.num = value;
+        break;
+    }
+
+    case T_SVIDX: /* Indexed string assignment: A$(expr) = string_expr */
+    {
+        /* T_SVIDX works like T_VIDX - parse expression between T_SVIDX and T_ENDX */
+        uint8_t *line_end = program_find_line_end(g_vm.pc);
+        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+
+        /* Skip T_ENDX terminator */
+        if (*g_vm.pc == T_ENDX)
+            g_vm.pc++;
+
+        /* Expect = */
+        if (*g_vm.pc != T_EQ_ASSIGN)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++;
+
+        /* For now, only handle string literals */
+        if (*g_vm.pc != T_STR)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++; /* Skip T_STR */
+
+        uint8_t orig_str_len = *g_vm.pc++;
+        uint8_t copy_len = (orig_str_len > STR_MAX) ? STR_MAX : orig_str_len;
+
+        /* Convert index to integer */
+        int index = (int)index_val;
+        if (index < 1 || index > VARS_MAX)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return;
+        }
+
+        VarCell *cell = &g_program.vars[index - 1];
+        cell->type = VAR_STR;
+
+        /* Copy string data, convert to uppercase (up to STR_MAX chars) */
+        int i;
+        for (i = 0; i < copy_len; i++)
+        {
+            char c = *g_vm.pc++;
+            if (c >= 'a' && c <= 'z')
+            {
+                c = c - 'a' + 'A'; /* Convert to uppercase */
+            }
+            cell->value.str[i] = c;
+        }
+        cell->value.str[i] = '\0'; /* Null terminate */
+
+        /* Skip remaining bytes if string was longer than STR_MAX */
+        for (int j = copy_len; j < orig_str_len; j++)
+        {
+            g_vm.pc++;
+        }
+
         break;
     }
 
@@ -535,6 +654,61 @@ void vm_execute_statement(void)
                 for (int i = 0; i < str_len; i++)
                 {
                     putchar(*g_vm.pc++);
+                }
+            }
+            else if (*g_vm.pc == T_SVAR)
+            {
+                /* Handle string variables */
+                g_vm.pc++; /* Skip T_SVAR */
+                uint8_t var_idx = *g_vm.pc++;
+                if (var_idx < 1 || var_idx > 26)
+                {
+                    error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                    return;
+                }
+                VarCell *cell = &g_program.vars[var_idx - 1];
+                if (cell->type == VAR_STR)
+                {
+                    printf("%s", cell->value.str);
+                }
+                else
+                {
+                    /* Print empty string for uninitialized string variables */
+                    /* (PC-1211 behavior for uninitialized string vars) */
+                }
+            }
+            else if (*g_vm.pc == T_SVIDX)
+            {
+                /* Handle indexed string variables */
+                g_vm.pc++; /* Skip T_SVIDX */
+
+                /* Evaluate index expression */
+                double index_val = vm_eval_expression(&g_vm.pc, line_end);
+                if (error_get_code() != ERR_NONE)
+                    return;
+
+                /* Skip T_ENDX terminator */
+                if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+                {
+                    g_vm.pc++;
+                }
+
+                /* Convert to integer index (truncate toward zero) */
+                int index = (int)index_val;
+                if (index < 1 || index > VARS_MAX)
+                {
+                    error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                    return;
+                }
+
+                VarCell *cell = &g_program.vars[index - 1];
+                if (cell->type == VAR_STR)
+                {
+                    printf("%s", cell->value.str);
+                }
+                else
+                {
+                    /* Print empty string for uninitialized string variables */
                 }
             }
             else
@@ -754,7 +928,8 @@ void vm_execute_statement(void)
         while (to_pos < line_end && *to_pos != T_TO && *to_pos != T_EOL)
         {
             to_pos = token_skip(to_pos);
-            if (!to_pos) break;
+            if (!to_pos)
+                break;
         }
 
         if (to_pos >= line_end || *to_pos != T_TO)
@@ -765,23 +940,26 @@ void vm_execute_statement(void)
 
         /* Evaluate start expression */
         double start_val = vm_eval_expression(&g_vm.pc, to_pos);
-        if (error_get_code() != ERR_NONE) return;
+        if (error_get_code() != ERR_NONE)
+            return;
 
         /* Skip TO */
         g_vm.pc = to_pos + 1;
 
         /* Find STEP keyword or end of statement */
         uint8_t *step_pos = g_vm.pc;
-        while (step_pos < line_end && *step_pos != T_STEP && 
+        while (step_pos < line_end && *step_pos != T_STEP &&
                *step_pos != T_COLON && *step_pos != T_EOL)
         {
             step_pos = token_skip(step_pos);
-            if (!step_pos) break;
+            if (!step_pos)
+                break;
         }
 
         /* Evaluate limit expression */
         double limit_val = vm_eval_expression(&g_vm.pc, step_pos);
-        if (error_get_code() != ERR_NONE) return;
+        if (error_get_code() != ERR_NONE)
+            return;
 
         /* Parse optional STEP */
         double step_val = 1.0; /* Default step */
@@ -792,10 +970,12 @@ void vm_execute_statement(void)
             while (stmt_end < line_end && *stmt_end != T_COLON && *stmt_end != T_EOL)
             {
                 stmt_end = token_skip(stmt_end);
-                if (!stmt_end) break;
+                if (!stmt_end)
+                    break;
             }
             step_val = vm_eval_expression(&g_vm.pc, stmt_end);
-            if (error_get_code() != ERR_NONE) return;
+            if (error_get_code() != ERR_NONE)
+                return;
         }
 
         /* Check for STEP = 0 error */
@@ -817,26 +997,32 @@ void vm_execute_statement(void)
 
         /* Determine pc_after_for: either next statement on same line or next line */
         uint8_t *pc_after_for;
-        
+
         /* Check if there are more statements on the current line */
-        if (g_vm.pc < line_end && *g_vm.pc == T_COLON) {
+        if (g_vm.pc < line_end && *g_vm.pc == T_COLON)
+        {
             /* There's a colon, so pc_after_for points to statement after colon */
             pc_after_for = g_vm.pc + 1; /* Skip the colon */
-        } else {
+        }
+        else
+        {
             /* No more statements on current line, jump to next line */
             pc_after_for = line_end;
-            if (*pc_after_for == T_EOL) {
+            if (*pc_after_for == T_EOL)
+            {
                 pc_after_for++; /* Skip T_EOL */
                 /* Skip line header (len + line_num) to get to tokens */
-                if (pc_after_for < g_program.prog + g_program.prog_len) {
+                if (pc_after_for < g_program.prog + g_program.prog_len)
+                {
                     pc_after_for += 2; /* Skip u16 len */
                     pc_after_for += 2; /* Skip u16 line_num */
                 }
             }
         }
-        
+
         vm_push_for(pc_after_for, var_idx, limit_val, step_val);
-        if (error_get_code() != ERR_NONE) return;
+        if (error_get_code() != ERR_NONE)
+            return;
 
         break;
     }
@@ -854,8 +1040,6 @@ void vm_execute_statement(void)
             var_idx = *g_vm.pc++;
             has_var = true;
         }
-        
-
 
         uint8_t *pc_after_for;
         uint8_t frame_var_idx;
@@ -919,23 +1103,26 @@ void vm_execute_statement(void)
         {
             /* Push frame back and jump to after FOR */
             vm_push_for(pc_after_for, frame_var_idx, limit, step);
-            if (error_get_code() != ERR_NONE) return;
-            
+            if (error_get_code() != ERR_NONE)
+                return;
+
             g_vm.pc = pc_after_for;
-            
+
             /* Update current line number if jumping to a different line */
             /* Iterate through all lines to find which contains pc_after_for */
             LineRecord *line = program_first_line();
-            while (line) {
+            while (line)
+            {
                 uint8_t *line_tokens = line->tokens;
                 uint8_t *line_end = program_find_line_end(line_tokens);
-                if (pc_after_for >= line_tokens && pc_after_for < line_end) {
+                if (pc_after_for >= line_tokens && pc_after_for < line_end)
+                {
                     g_vm.current_line = line->line_num;
                     break;
                 }
                 line = program_next_line(line);
             }
-            
+
             return; /* Don't advance PC normally */
         }
         /* Loop finished - continue to next statement */
@@ -973,6 +1160,189 @@ void vm_execute_statement(void)
         {
 
             g_vm.running = false;
+        }
+        break;
+    }
+
+    case T_INPUT:
+    {
+        /* INPUT variable - read value from user */
+        if (*g_vm.pc == T_VAR)
+        {
+            /* Numeric variable */
+            g_vm.pc++; /* Skip T_VAR */
+            uint8_t var_idx = *g_vm.pc++;
+
+            if (var_idx < 1 || var_idx > 26)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            printf("? ");
+            fflush(stdout);
+
+            char input[100];
+            if (fgets(input, sizeof(input), stdin))
+            {
+                double value = atof(input);
+                VarCell *cell = &g_program.vars[var_idx - 1];
+                cell->type = VAR_NUM;
+                cell->value.num = value;
+            }
+        }
+        else if (*g_vm.pc == T_SVAR)
+        {
+            /* String variable */
+            g_vm.pc++; /* Skip T_SVAR */
+            uint8_t var_idx = *g_vm.pc++;
+
+            if (var_idx < 1 || var_idx > 26)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            printf("? ");
+            fflush(stdout);
+
+            char input[100];
+            if (fgets(input, sizeof(input), stdin))
+            {
+                /* Remove newline if present */
+                int len = strlen(input);
+                if (len > 0 && input[len - 1] == '\n')
+                {
+                    input[len - 1] = '\0';
+                    len--;
+                }
+
+                /* Limit to 7 characters and convert to uppercase */
+                if (len > STR_MAX)
+                {
+                    len = STR_MAX;
+                }
+
+                VarCell *cell = &g_program.vars[var_idx - 1];
+                cell->type = VAR_STR;
+
+                int i;
+                for (i = 0; i < len; i++)
+                {
+                    char c = input[i];
+                    if (c >= 'a' && c <= 'z')
+                    {
+                        c = c - 'a' + 'A'; /* Convert to uppercase */
+                    }
+                    cell->value.str[i] = c;
+                }
+                cell->value.str[i] = '\0';
+            }
+        }
+        else if (*g_vm.pc == T_VIDX)
+        {
+            /* Indexed numeric variable */
+            g_vm.pc++; /* Skip T_VIDX */
+            g_vm.pc++; /* Skip placeholder byte */
+
+            /* Evaluate index expression */
+            uint8_t *line_end = program_find_line_end(g_vm.pc);
+            double index_val = vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip T_ENDX terminator */
+            if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+            {
+                g_vm.pc++;
+            }
+
+            /* Convert to integer index */
+            int index = (int)index_val;
+            if (index < 1 || index > VARS_MAX)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            printf("? ");
+            fflush(stdout);
+
+            char input[100];
+            if (fgets(input, sizeof(input), stdin))
+            {
+                double value = atof(input);
+                VarCell *cell = &g_program.vars[index - 1];
+                cell->type = VAR_NUM;
+                cell->value.num = value;
+            }
+        }
+        else if (*g_vm.pc == T_SVIDX)
+        {
+            /* Indexed string variable */
+            g_vm.pc++; /* Skip T_SVIDX */
+            g_vm.pc++; /* Skip placeholder byte */
+
+            /* Evaluate index expression */
+            uint8_t *line_end = program_find_line_end(g_vm.pc);
+            double index_val = vm_eval_expression(&g_vm.pc, line_end);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            /* Skip T_ENDX terminator */
+            if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+            {
+                g_vm.pc++;
+            }
+
+            /* Convert to integer index */
+            int index = (int)index_val;
+            if (index < 1 || index > VARS_MAX)
+            {
+                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                return;
+            }
+
+            printf("? ");
+            fflush(stdout);
+
+            char input[100];
+            if (fgets(input, sizeof(input), stdin))
+            {
+                /* Remove newline if present */
+                int len = strlen(input);
+                if (len > 0 && input[len - 1] == '\n')
+                {
+                    input[len - 1] = '\0';
+                    len--;
+                }
+
+                /* Limit to 7 characters and convert to uppercase */
+                if (len > STR_MAX)
+                {
+                    len = STR_MAX;
+                }
+
+                VarCell *cell = &g_program.vars[index - 1];
+                cell->type = VAR_STR;
+
+                int i;
+                for (i = 0; i < len; i++)
+                {
+                    char c = input[i];
+                    if (c >= 'a' && c <= 'z')
+                    {
+                        c = c - 'a' + 'A'; /* Convert to uppercase */
+                    }
+                    cell->value.str[i] = c;
+                }
+                cell->value.str[i] = '\0';
+            }
+        }
+        else
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
         }
         break;
     }
