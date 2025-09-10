@@ -19,6 +19,10 @@ const char *token_name(Tok token)
         return "VAR";
     case T_VIDX:
         return "VIDX";
+    case T_SVAR:
+        return "SVAR";
+    case T_SVIDX:
+        return "SVIDX";
     case T_ENDX:
         return "ENDX";
 
@@ -213,6 +217,13 @@ void cmd_list_line(uint16_t line_num)
             break;
         }
 
+        case T_SVAR:
+        {
+            printf("%c$", 'A' + pos[1] - 1);
+            pos += 2;
+            break;
+        }
+
         case T_VIDX:
         {
             printf("A(");
@@ -239,6 +250,88 @@ void cmd_list_line(uint16_t line_num)
                 case T_VAR:
                 {
                     printf("%c", 'A' + pos[1] - 1);
+                    pos += 2;
+                    break;
+                }
+                case T_SVAR:
+                {
+                    printf("%c$", 'A' + pos[1] - 1);
+                    pos += 2;
+                    break;
+                }
+                case T_PLUS:
+                    printf("+");
+                    pos++;
+                    break;
+                case T_MINUS:
+                    printf("-");
+                    pos++;
+                    break;
+                case T_MUL:
+                    printf("*");
+                    pos++;
+                    break;
+                case T_DIV:
+                    printf("/");
+                    pos++;
+                    break;
+                case T_POW:
+                    printf("^");
+                    pos++;
+                    break;
+                case T_LP:
+                    printf("(");
+                    pos++;
+                    break;
+                case T_RP:
+                    printf(")");
+                    pos++;
+                    break;
+                default:
+                    pos++;
+                    break;
+                }
+            }
+            if (pos < end && *pos == T_ENDX)
+            {
+                pos++;
+            }
+            printf(")");
+            break;
+        }
+
+        case T_SVIDX:
+        {
+            printf("A$(");
+            pos++;
+            /* Parse expression until T_ENDX */
+            int paren_level = 0;
+            while (pos < end && !(*pos == T_ENDX && paren_level == 0))
+            {
+                if (*pos == T_LP)
+                    paren_level++;
+                if (*pos == T_RP)
+                    paren_level--;
+
+                /* Recursively display expression tokens */
+                switch (*pos)
+                {
+                case T_NUM:
+                {
+                    double val = *(double *)(pos + 1);
+                    printf("%g", val);
+                    pos += 9;
+                    break;
+                }
+                case T_VAR:
+                {
+                    printf("%c", 'A' + pos[1] - 1);
+                    pos += 2;
+                    break;
+                }
+                case T_SVAR:
+                {
+                    printf("%c$", 'A' + pos[1] - 1);
                     pos += 2;
                     break;
                 }
@@ -431,6 +524,26 @@ void disassemble_tokens(const uint8_t *tokens, int len)
         case T_VAR:
             printf(" (%c)", 'A' + pos[1] - 1);
             pos += 2;
+            break;
+
+        case T_SVAR:
+            printf(" (%c$)", 'A' + pos[1] - 1);
+            pos += 2;
+            break;
+
+        case T_SVIDX:
+            printf(" (A$(");
+            pos += 2;
+            while (pos < end && *pos != T_ENDX)
+            {
+                printf("%02X ", *pos);
+                pos++;
+            }
+            if (pos < end && *pos == T_ENDX)
+            {
+                printf("))");
+                pos++;
+            }
             break;
 
         case T_GOTO:

@@ -24,13 +24,20 @@ $(TARGET): $(OBJECTS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Test runner (when implemented)
-test: $(TARGET)
-	@echo "Test runner not implemented yet"
-	@echo "You can test manually with sample BASIC programs"
+# Test runner
+TEST_RUNNER = test_runner
+TEST_RUNNER_SRC = tests/t_runner.c
+TEST_RUNNER_OBJECTS = program.o tokenizer.o vm.o errors.o
+
+$(TEST_RUNNER): $(TEST_RUNNER_SRC) $(TEST_RUNNER_OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
+
+test: $(TEST_RUNNER)
+	./$(TEST_RUNNER)
 
 clean:
-	rm -f $(OBJECTS) $(TEST_OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(TEST_OBJECTS) $(TARGET) $(TEST_RUNNER)
+	rm -rf *.dSYM $(TEST_RUNNER).dSYM
 
 help:
 	@echo "PC-1211 BASIC Interpreter Build System"

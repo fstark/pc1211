@@ -148,10 +148,9 @@ void emit_token_double(Tokenizer *t, Tok token, double data)
     t->token_len += 8;
 }
 
-void emit_token_string(Tokenizer *t, Tok token, const char *str, int len)
+/* Emit string token without length restriction (for source literals, comments) */
+void emit_token_string_unrestricted(Tokenizer *t, Tok token, const char *str, int len)
 {
-    if (len > STR_MAX)
-        len = STR_MAX;
     if (t->token_len + 2 + len > TOKBUF_LINE_MAX)
     {
         error_report(ERR_LINE_TOO_LONG, t->line_num);
@@ -169,6 +168,14 @@ void emit_token_string(Tokenizer *t, Tok token, const char *str, int len)
         }
         t->tokens[t->token_len++] = (uint8_t)c;
     }
+}
+
+/* Emit string token with variable length restriction (for variable assignments) */
+void emit_token_string(Tokenizer *t, Tok token, const char *str, int len)
+{
+    if (len > STR_MAX)
+        len = STR_MAX;
+    emit_token_string_unrestricted(t, token, str, len);
 }
 
 /* Parse a number */
@@ -214,11 +221,11 @@ bool parse_string(Tokenizer *t)
     }
 
     t->pos++; /* Skip closing quote */
-    emit_token_string(t, T_STR, start, len);
+    emit_token_string_unrestricted(t, T_STR, start, len);
     return true;
 }
 
-/* Parse a variable (A-Z) or A(expr) */
+/* Parse a variable (A-Z, A$-Z$) or A(expr) */
 bool parse_variable(Tokenizer *t)
 {
     char c = t->input[t->pos];
@@ -229,10 +236,25 @@ bool parse_variable(Tokenizer *t)
 
     t->pos++;
 
-    /* Check for A(expr) syntax */
+    /* Check for string variable suffix $ */
+    bool is_string_var = false;
+    if (t->input[t->pos] == '$')
+    {
+        is_string_var = true;
+        t->pos++; /* Skip '$' */
+    }
+
+    /* Check for A(expr) or A$(expr) syntax */
     if (c == 'A' && t->input[t->pos] == '(')
     {
-        emit_token(t, T_VIDX);
+        if (is_string_var)
+        {
+            emit_token(t, T_SVIDX); /* String indexed variable */
+        }
+        else
+        {
+            emit_token(t, T_VIDX); /* Numeric indexed variable */
+        }
         t->pos++; /* Skip '(' */
 
         /* Parse expression inside parentheses */
@@ -257,8 +279,15 @@ bool parse_variable(Tokenizer *t)
     }
     else
     {
-        /* Simple variable A-Z */
-        emit_token_u8(t, T_VAR, c - 'A' + 1);
+        /* Simple variable A-Z or A$-Z$ */
+        if (is_string_var)
+        {
+            emit_token_u8(t, T_SVAR, c - 'A' + 1);
+        }
+        else
+        {
+            emit_token_u8(t, T_VAR, c - 'A' + 1);
+        }
         return true;
     }
 }
@@ -509,7 +538,7 @@ bool tokenize_line(const char *line, uint16_t line_num, uint8_t *tokens, int *to
             }
             if (comment_len > 0)
             {
-                emit_token_string(&t, T_STR, comment, comment_len);
+                emit_token_string_unrestricted(&t, T_STR, comment, comment_len);
             }
         }
 

@@ -50,7 +50,7 @@ yet.
     operators, `:` and end-of-line.
 -   Recognize **keywords + abbreviations** (e.g., `SIN` / `SI.`);
     case-insensitive; `√` maps to `SQR` (ASCII `SQR` accepted).
--   **String handling**: ASCII only, uppercase, max 7 chars, no coercion.
+-   **String handling**: ASCII only, uppercase conversion. 7-char limit only applies to variable storage, not source literals or comments.
 -   **Line numbers**: Range 1-999; duplicate lines replace previous.
 -   **Line insertion**: O(n²) insertion maintaining memory order (authentic behavior).
 -   Encode **statements**:
@@ -66,7 +66,7 @@ yet.
 **Tests (token-only):** 
 - Round-trip dump: a **token disassembler** that prints a readable listing, to verify encodings. 
 - **LIST command**: Early implementation for debugging internal representation.
-- Edge cases: long line up to `TOKBUF_LINE_MAX`, strings truncated to 7, mixed abbreviations.
+- Edge cases: long line up to `TOKBUF_LINE_MAX`, long strings in source (REM comments, literals), mixed abbreviations.
 - Line insertion: Test duplicate line replacement and memory reordering.
 
 **Exit criteria:** Token dump of sample programs matches expectations. LIST command works.

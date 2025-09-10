@@ -47,5 +47,6 @@ void emit_token_u8(Tokenizer *t, Tok token, uint8_t data);
 void emit_token_u16(Tokenizer *t, Tok token, uint16_t data);
 void emit_token_double(Tokenizer *t, Tok token, double data);
 void emit_token_string(Tokenizer *t, Tok token, const char *str, int len);
+void emit_token_string_unrestricted(Tokenizer *t, Tok token, const char *str, int len);
 
 #endif /* TOKENIZER_H */

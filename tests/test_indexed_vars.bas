@@ -1,0 +1,6 @@
+10 I=1
+20 J=2
+30 A$(I)="FIRST"
+40 A$(J)="SECOND"
+50 PRINT A$(I)
+60 PRINT A$(J)

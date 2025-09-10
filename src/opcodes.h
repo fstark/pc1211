@@ -7,12 +7,14 @@
 typedef enum
 {
     /* Core tokens */
-    T_EOL = 0x00,  /* end of line record */
-    T_NUM = 0x01,  /* <8 bytes double> */
-    T_STR = 0x02,  /* <u8 n> <n bytes> (0..7) */
-    T_VAR = 0x03,  /* <u8 1..26> (A..Z) */
-    T_VIDX = 0x04, /* A(expr); expr follows, terminated by T_ENDX */
-    T_ENDX = 0xFF, /* terminator for T_VIDX inline expression */
+    T_EOL = 0x00,   /* end of line record */
+    T_NUM = 0x01,   /* <8 bytes double> */
+    T_STR = 0x02,   /* <u8 n> <n bytes> (0..7) */
+    T_VAR = 0x03,   /* <u8 1..26> (A..Z) - numeric variable */
+    T_VIDX = 0x04,  /* A(expr); expr follows, terminated by T_ENDX */
+    T_SVAR = 0x05,  /* <u8 1..26> (A$..Z$) - string variable */
+    T_SVIDX = 0x06, /* A$(expr); expr follows, terminated by T_ENDX */
+    T_ENDX = 0xFF,  /* terminator for T_VIDX/T_SVIDX inline expression */
 
     /* Operators & punctuation */
     T_EQ_ASSIGN = 0x10, /* = assignment */
