@@ -1,7 +1,7 @@
 10 REM Variable test
 20 A=1.5
-30 B="TEST"
-40 A(27)="INDEX"
-50 PRINT A, B
-60 PRINT A(27)
+30 B$="TEST"
+40 A$(27)="INDEX"
+50 PRINT A, B$
+60 PRINT A$(27)
 70 END

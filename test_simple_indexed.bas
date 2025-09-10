@@ -1,4 +1,0 @@
-10 A$(1)="HELLO"
-20 A$(2)="WORLD"
-30 PRINT A$(1)
-40 PRINT A$(2)

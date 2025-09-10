@@ -1,4 +1,0 @@
-10 A$(10)="HELLO"
-20 PRINT A$(10)
-30 A$(A+1)="WORLD"
-40 PRINT A$(A+1)
