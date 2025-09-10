@@ -170,18 +170,25 @@ Mixed `INPUT A, A(27), B`.
 
 **Goal:** Implement all function opcodes from v0.5.
 
--   Trig (radians): `SIN, COS, TAN`.
--   Inverse trig: `ASN(asin), ACS(acos), ATN(atan)`.
--   Logs/exp: `LOG(10), LN, EXP`.
--   `SQR` (sqrt), `INT` (truncate toward 0), `ABS`, `SGN`.
--   Conversions: `DMS`, `DEG` (implement as stubs with assert(false) for now).
--   **Domain errors**: Type 1 error (e.g., `SQR(-1)`, `LOG(0)`, `ASN(2)`).
+-   **Trig (radians)**: `SIN, COS, TAN` - standard libc implementations.
+-   **Inverse trig**: `ASN(asin), ACS(acos), ATN(atan)` - use libc, natural domain errors.
+-   **Logs/exp**: `LOG(10), LN, EXP` - use libc, natural domain errors.
+-   **Math functions**:
+    -   `SQR` (sqrt) - use libc, natural domain errors.
+    -   `INT` (floor function) - `INT(-3.7) = -4`, always rounds down.
+    -   `ABS` - absolute value, standard implementation.
+    -   `SGN` - sign function returning -1, 0, or 1.
+-   **Conversions**:
+    -   `DMS(x)` - decimal degrees → DD.MMSS format (15.4125 → 15.2445).
+    -   `DEG(x)` - DD.MMSS format → decimal degrees (15.2445 → 15.4125).
+    -   DMS format: integer=degrees, digits 1-2=minutes, 3-4=seconds, 5+=fractional seconds.
+-   **Domain errors**: Use libc behavior, generate ERR_MATH_DOMAIN for invalid inputs.
 
-**Tests:** - Spot-check values; `INT` negative behavior; `SGN` at −, 0,
-+. - `DMS/DEG` round trips on a few angles.
+**Tests:** - Spot-check values; `INT(-3.7) = -4`; `SGN` at −1, 0, +1.
+- `DMS/DEG` round trips: `DEG(DMS(15.4125)) = 15.4125`.
 
 **Exit criteria:** All functions callable in expressions; no crashes on
-domain errors (document behavior; e.g., `ACS(2)` → error).
+domain errors; DMS/DEG conversions work correctly.
 
 ------------------------------------------------------------------------
 
