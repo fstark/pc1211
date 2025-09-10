@@ -263,7 +263,16 @@ uint8_t *token_skip(uint8_t *token)
 
     case T_GOTO:
     case T_GOSUB:
-        return token + 1 + 2; /* opcode + u16 line number */
+        /* GOTO/GOSUB now followed by expression, skip to next statement */
+        {
+            uint8_t *pos = token + 1;
+            /* Skip the expression tokens until we hit a statement terminator */
+            while (pos && *pos != T_EOL && *pos != T_COLON && *pos != 0)
+            {
+                pos = token_skip(pos);
+            }
+            return pos;
+        }
 
     default:
         return token + 1; /* Just the opcode */
@@ -310,12 +319,9 @@ void token_dump(const uint8_t *tokens, int len)
 
         case T_GOTO:
         case T_GOSUB:
-        {
-            uint16_t line = *(uint16_t *)(pos + 1);
-            printf(" (LINE: %d)", line);
-            pos += 3;
+            printf(" (+ expression)");
+            pos += 1;
             break;
-        }
 
         default:
             pos += 1;

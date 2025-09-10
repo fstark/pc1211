@@ -1,0 +1,7 @@
+10 PRINT "Testing GOSUB expression"
+20 B=200
+30 GOSUB B
+40 PRINT "Back from GOSUB"
+50 END
+200 PRINT "GOSUB B worked!"
+210 RETURN

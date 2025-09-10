@@ -1065,14 +1065,16 @@ void vm_execute_statement(void)
 
     case T_GOTO:
     {
-        if (*g_vm.pc != T_NUM)
-        {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-            return;
+        /* Find end of expression properly by skipping tokens */
+        uint8_t *line_end = g_vm.pc;
+        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
+            line_end = token_skip(line_end);
+            if (!line_end) break;
         }
-        g_vm.pc++;
-        double line_num = *(double *)g_vm.pc;
-        g_vm.pc += sizeof(double);
+        
+        double line_num = parse_expression(&g_vm.pc, line_end);
+        if (error_get_code() != ERR_NONE)
+            return;
 
         /* Jump to line */
         uint8_t *target = program_find_line_tokens((int)line_num);
@@ -1198,16 +1200,19 @@ void vm_execute_statement(void)
 
     case T_GOSUB:
     {
-        if (*g_vm.pc != T_NUM)
-        {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-            return;
+        /* Find end of expression properly by skipping tokens */
+        uint8_t *line_end = g_vm.pc;
+        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0) {
+            line_end = token_skip(line_end);
+            if (!line_end) break;
         }
-        g_vm.pc++;
-        double line_num = *(double *)g_vm.pc;
-        g_vm.pc += sizeof(double);
+        
+        /* Evaluate expression to get line number */
+        double line_num = parse_expression(&g_vm.pc, line_end);
+        if (error_get_code() != ERR_NONE)
+            return;
 
-        /* Push return address onto call stack */
+        /* Push return address onto call stack (should be end of expression) */
         vm_push_call(g_vm.pc, g_vm.current_line);
         if (error_get_code() != ERR_NONE)
             return;

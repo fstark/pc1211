@@ -377,13 +377,7 @@ bool parse_keyword(Tokenizer *t)
         if (kw->token == T_GOTO || kw->token == T_GOSUB)
         {
             emit_token(t, kw->token);
-            skip_whitespace(t);
-            /* Parse line number */
-            if (!parse_number(t))
-            {
-                error_report(ERR_SYNTAX_ERROR, t->line_num);
-                return false;
-            }
+            /* Expression will be parsed later in normal token flow */
         }
         else if (kw->token == T_THEN)
         {

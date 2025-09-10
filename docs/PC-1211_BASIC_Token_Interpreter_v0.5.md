@@ -142,9 +142,9 @@ opcode as noted.
                                                               For line jumps we store a u16 line after `THEN`.
                                                               NOT used for conditional statements.
 
-  45            `GOTO`                     `G.` ✔             Jumps by **linear scan** for `u16 line`.
+  45            `GOTO`                     `G.` ✔             Jumps by **linear scan**. Takes **expression** (not fixed line).
 
-  46            `GOSUB`                  `GOS.` ✔             Push return PC to static stack; jump by scan.
+  46            `GOSUB`                  `GOS.` ✔             Push return PC to static stack; jump by scan. Takes **expression**.
 
   47            `RETURN`                  `RE.` ✔             Pops; error if empty.
 

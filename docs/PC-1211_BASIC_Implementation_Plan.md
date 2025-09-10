@@ -119,6 +119,8 @@ for indices in 1..VARS_MAX; error if outside range.
 
 **Exit criteria:** Branching and subroutines stable. ✅ **COMPLETED**
 
+**Enhancement (Post-Phase 7):** GOTO/GOSUB now accept **expressions** instead of just literal line numbers. Examples: `GOTO A*10+50`, `GOSUB B+200`.
+
 ------------------------------------------------------------------------
 
 # Phase 4 --- FOR/NEXT (unstructured-friendly)
