@@ -130,6 +130,8 @@ elsewhere).
     -   Push frame `{pc_after_for, var_idx, limit, step}`; assign
         `v=start`.
     -   **STEP = 0**: Type 1 error.
+    -   **Same-line support**: `FOR I=1 TO 5:PRINT I` correctly sets
+        `pc_after_for` to statement after colon, not next line.
 -   `NEXT [v]`:
     -   If named: find matching topmost frame by var; if unnamed: use
         top.
@@ -138,11 +140,12 @@ elsewhere).
         `pc_after_for`; else pop.
 -   **Don't** enforce structural pairing at tokenize time.
 
-**Tests:** - Your "NEXT at target line" example. - Nested loops;
+**Tests:** - `FOR I=1 TO 5:PRINT I` (same-line statements). 
+- Unstructured "NEXT at target line" example. - Nested loops;
 negative step; `NEXT` without `FOR` error.
 
 **Exit criteria:** Looping semantics match examples, including
-cross-line `NEXT`.
+cross-line `NEXT`. ✅ **COMPLETED**
 
 ------------------------------------------------------------------------
 

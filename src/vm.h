@@ -26,6 +26,22 @@ typedef struct
     int top;
 } CallStack;
 
+/* FOR/NEXT loop stack */
+#define FOR_STACK_SIZE 16
+typedef struct
+{
+    uint8_t *pc_after_for; /* PC after the FOR statement */
+    uint8_t var_idx;       /* Loop variable index (1-26 for A-Z) */
+    double limit;          /* TO value */
+    double step;           /* STEP value */
+} ForFrame;
+
+typedef struct
+{
+    ForFrame frames[FOR_STACK_SIZE];
+    int top;
+} ForStack;
+
 /* VM state */
 typedef struct
 {
@@ -34,6 +50,7 @@ typedef struct
     bool running;         /* VM running state */
     ExprStack expr_stack; /* Expression evaluation stack */
     CallStack call_stack; /* GOSUB/RETURN call stack */
+    ForStack for_stack;   /* FOR/NEXT loop stack */
 } VM;
 
 /* VM initialization and control */
@@ -53,6 +70,11 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end);
 /* Call stack management */
 void vm_push_call(uint8_t *return_pc, int return_line);
 bool vm_pop_call(uint8_t **return_pc, int *return_line);
+
+/* FOR loop stack management */
+void vm_push_for(uint8_t *pc_after_for, uint8_t var_idx, double limit, double step);
+bool vm_pop_for(uint8_t **pc_after_for, uint8_t *var_idx, double *limit, double *step);
+bool vm_find_for_by_var(uint8_t var_idx, int *frame_index);
 
 /* Statement execution */
 void vm_execute_statement(void);

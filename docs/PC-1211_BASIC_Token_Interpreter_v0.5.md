@@ -149,14 +149,16 @@ opcode as noted.
   47            `RETURN`                  `RE.` ✔             Pops; error if empty.
 
   48            `FOR`                      `F.` ✔             `FOR v = start TO limit [STEP step]` pushes
-                                                              static frame.
+                                                              static frame. Supports same-line statements:
+                                                              `FOR I=1 TO 5:PRINT I` works correctly.
 
   49            `TO`                        --- (part of FOR) Token emitted inside FOR encoding.
 
-  4A            `STEP`                   `STE.` (part of FOR) Optional in FOR.
+  4A            `STEP`                   `STE.` (part of FOR) Optional in FOR. Default step=1. STEP=0 → error.
 
-  4B            `NEXT`                     `N.` ✔             With or without var. Matches top frame or
-                                                              searches down.
+  4B            `NEXT`                     `N.` ✔             `NEXT [v]`: named NEXT finds matching FOR by
+                                                              variable, unnamed uses top frame. Supports
+                                                              unstructured flow (NEXT on different lines).
 
   4C            `END`                      `E.` ✔             Terminate.
 
@@ -254,6 +256,55 @@ IF X>0 GOSUB 500       ← Call subroutine if X positive
 ```basic
 IF A=3 THEN PRINT "NO" ← WRONG! THEN is only for line numbers
 IF A=3 THEN LET B=42   ← WRONG! Use: IF A=3 LET B=42
+```
+
+### 5.2) FOR/NEXT Loop Examples (PC-1211 specific)
+
+**Basic FOR loops:**
+```basic
+FOR I=1 TO 5           ← Loop I from 1 to 5
+PRINT I                ← Body on separate line
+NEXT I                 ← Named NEXT
+
+FOR J=0 TO 10 STEP 2   ← With explicit step
+PRINT J
+NEXT                   ← Unnamed NEXT (uses top stack frame)
+```
+
+**Same-line statements (colon separator):**
+```basic
+FOR I=1 TO 3:PRINT I   ← Loop body on same line after colon
+NEXT I                 ← NEXT can be on different line
+
+FOR K=5 TO 1 STEP -1:PRINT "DOWN"; K:NEXT K  ← Multiple statements
+```
+
+**Unstructured flow (PC-1211 authentic behavior):**
+```basic
+10 FOR I=1 TO 3
+20 IF I=2 THEN 100     ← Jump to different line for I=2
+30 PRINT I
+40 NEXT I              ← Normal NEXT for I=1,3
+50 END
+100 PRINT "TWO"
+110 NEXT I             ← NEXT from different line for I=2
+```
+
+**Nested loops:**
+```basic
+FOR I=1 TO 2
+  FOR J=1 TO 2
+    PRINT I; J
+  NEXT J               ← Inner loop NEXT
+NEXT I                 ← Outer loop NEXT
+```
+
+**Error conditions:**
+```basic
+FOR I=1 TO 5 STEP 0   ← ERROR: STEP cannot be zero
+NEXT I
+
+NEXT K                ← ERROR: NEXT without matching FOR
 ```
 
 ------------------------------------------------------------------------

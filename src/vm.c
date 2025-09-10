@@ -16,6 +16,7 @@ void vm_init(void)
     g_vm.running = false;
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
+    g_vm.for_stack.top = 0;
 }
 
 /* Push value onto expression stack */
@@ -65,6 +66,52 @@ bool vm_pop_call(uint8_t **return_pc, int *return_line)
     *return_pc = g_vm.call_stack.frames[g_vm.call_stack.top].return_pc;
     *return_line = g_vm.call_stack.frames[g_vm.call_stack.top].return_line;
     return true;
+}
+
+/* Push FOR frame onto FOR stack */
+void vm_push_for(uint8_t *pc_after_for, uint8_t var_idx, double limit, double step)
+{
+    if (g_vm.for_stack.top >= FOR_STACK_SIZE)
+    {
+        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
+        return;
+    }
+    g_vm.for_stack.frames[g_vm.for_stack.top].pc_after_for = pc_after_for;
+    g_vm.for_stack.frames[g_vm.for_stack.top].var_idx = var_idx;
+    g_vm.for_stack.frames[g_vm.for_stack.top].limit = limit;
+    g_vm.for_stack.frames[g_vm.for_stack.top].step = step;
+    g_vm.for_stack.top++;
+}
+
+/* Pop FOR frame from FOR stack */
+bool vm_pop_for(uint8_t **pc_after_for, uint8_t *var_idx, double *limit, double *step)
+{
+    if (g_vm.for_stack.top <= 0)
+    {
+        error_set(ERR_NEXT_WITHOUT_FOR, g_vm.current_line);
+        return false;
+    }
+    g_vm.for_stack.top--;
+    *pc_after_for = g_vm.for_stack.frames[g_vm.for_stack.top].pc_after_for;
+    *var_idx = g_vm.for_stack.frames[g_vm.for_stack.top].var_idx;
+    *limit = g_vm.for_stack.frames[g_vm.for_stack.top].limit;
+    *step = g_vm.for_stack.frames[g_vm.for_stack.top].step;
+    return true;
+}
+
+/* Find FOR frame by variable index (for named NEXT) */
+bool vm_find_for_by_var(uint8_t var_idx, int *frame_index)
+{
+    /* Search from top of stack downward */
+    for (int i = g_vm.for_stack.top - 1; i >= 0; i--)
+    {
+        if (g_vm.for_stack.frames[i].var_idx == var_idx)
+        {
+            *frame_index = i;
+            return true;
+        }
+    }
+    return false;
 }
 
 /* Forward declarations for expression parsing */
@@ -678,6 +725,221 @@ void vm_execute_statement(void)
         g_vm.pc = return_pc;
         g_vm.current_line = return_line;
         return; /* Don't advance PC normally */
+    }
+
+    case T_FOR:
+    {
+        /* FOR var = start TO limit [STEP step] */
+        if (*g_vm.pc != T_VAR)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++;
+        uint8_t var_idx = *g_vm.pc++;
+
+        /* Expect = */
+        if (*g_vm.pc != T_EQ_ASSIGN)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+        g_vm.pc++;
+
+        /* Parse start expression */
+        uint8_t *line_end = program_find_line_end(g_vm.pc);
+        uint8_t *to_pos = g_vm.pc;
+
+        /* Find TO keyword */
+        while (to_pos < line_end && *to_pos != T_TO && *to_pos != T_EOL)
+        {
+            to_pos = token_skip(to_pos);
+            if (!to_pos) break;
+        }
+
+        if (to_pos >= line_end || *to_pos != T_TO)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return;
+        }
+
+        /* Evaluate start expression */
+        double start_val = vm_eval_expression(&g_vm.pc, to_pos);
+        if (error_get_code() != ERR_NONE) return;
+
+        /* Skip TO */
+        g_vm.pc = to_pos + 1;
+
+        /* Find STEP keyword or end of statement */
+        uint8_t *step_pos = g_vm.pc;
+        while (step_pos < line_end && *step_pos != T_STEP && 
+               *step_pos != T_COLON && *step_pos != T_EOL)
+        {
+            step_pos = token_skip(step_pos);
+            if (!step_pos) break;
+        }
+
+        /* Evaluate limit expression */
+        double limit_val = vm_eval_expression(&g_vm.pc, step_pos);
+        if (error_get_code() != ERR_NONE) return;
+
+        /* Parse optional STEP */
+        double step_val = 1.0; /* Default step */
+        if (step_pos < line_end && *step_pos == T_STEP)
+        {
+            g_vm.pc = step_pos + 1; /* Skip STEP */
+            uint8_t *stmt_end = step_pos;
+            while (stmt_end < line_end && *stmt_end != T_COLON && *stmt_end != T_EOL)
+            {
+                stmt_end = token_skip(stmt_end);
+                if (!stmt_end) break;
+            }
+            step_val = vm_eval_expression(&g_vm.pc, stmt_end);
+            if (error_get_code() != ERR_NONE) return;
+        }
+
+        /* Check for STEP = 0 error */
+        if (step_val == 0.0)
+        {
+            error_set(ERR_FOR_STEP_ZERO, g_vm.current_line);
+            return;
+        }
+
+        /* Store start value in loop variable */
+        if (var_idx < 1 || var_idx > 26)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return;
+        }
+        VarCell *cell = &g_program.vars[var_idx - 1];
+        cell->type = VAR_NUM;
+        cell->value.num = start_val;
+
+        /* Determine pc_after_for: either next statement on same line or next line */
+        uint8_t *pc_after_for;
+        
+        /* Check if there are more statements on the current line */
+        if (g_vm.pc < line_end && *g_vm.pc == T_COLON) {
+            /* There's a colon, so pc_after_for points to statement after colon */
+            pc_after_for = g_vm.pc + 1; /* Skip the colon */
+        } else {
+            /* No more statements on current line, jump to next line */
+            pc_after_for = line_end;
+            if (*pc_after_for == T_EOL) {
+                pc_after_for++; /* Skip T_EOL */
+                /* Skip line header (len + line_num) to get to tokens */
+                if (pc_after_for < g_program.prog + g_program.prog_len) {
+                    pc_after_for += 2; /* Skip u16 len */
+                    pc_after_for += 2; /* Skip u16 line_num */
+                }
+            }
+        }
+        
+        vm_push_for(pc_after_for, var_idx, limit_val, step_val);
+        if (error_get_code() != ERR_NONE) return;
+
+        break;
+    }
+
+    case T_NEXT:
+    {
+        /* NEXT [var] */
+        uint8_t var_idx = 0;
+        bool has_var = false;
+
+        /* Check if followed by variable */
+        if (*g_vm.pc == T_VAR)
+        {
+            g_vm.pc++;
+            var_idx = *g_vm.pc++;
+            has_var = true;
+        }
+        
+
+
+        uint8_t *pc_after_for;
+        uint8_t frame_var_idx;
+        double limit, step;
+
+        if (has_var)
+        {
+            /* Named NEXT - find matching FOR frame */
+            int frame_index;
+            if (!vm_find_for_by_var(var_idx, &frame_index))
+            {
+                error_set(ERR_NEXT_WITHOUT_FOR, g_vm.current_line);
+                return;
+            }
+
+            /* Get frame data */
+            ForFrame *frame = &g_vm.for_stack.frames[frame_index];
+            pc_after_for = frame->pc_after_for;
+            frame_var_idx = frame->var_idx;
+            limit = frame->limit;
+            step = frame->step;
+
+            /* Remove this frame and all frames above it */
+            g_vm.for_stack.top = frame_index;
+        }
+        else
+        {
+            /* Unnamed NEXT - use top FOR frame */
+            if (!vm_pop_for(&pc_after_for, &frame_var_idx, &limit, &step))
+            {
+                return; /* Error already set */
+            }
+        }
+
+        /* Update loop variable */
+        if (frame_var_idx < 1 || frame_var_idx > 26)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return;
+        }
+        VarCell *cell = &g_program.vars[frame_var_idx - 1];
+        if (cell->type != VAR_NUM)
+        {
+            error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+            return;
+        }
+        cell->value.num += step;
+
+        /* Check loop condition */
+        bool continue_loop;
+        if (step > 0)
+        {
+            continue_loop = (cell->value.num <= limit);
+        }
+        else
+        {
+            continue_loop = (cell->value.num >= limit);
+        }
+
+        if (continue_loop)
+        {
+            /* Push frame back and jump to after FOR */
+            vm_push_for(pc_after_for, frame_var_idx, limit, step);
+            if (error_get_code() != ERR_NONE) return;
+            
+            g_vm.pc = pc_after_for;
+            
+            /* Update current line number if jumping to a different line */
+            /* Iterate through all lines to find which contains pc_after_for */
+            LineRecord *line = program_first_line();
+            while (line) {
+                uint8_t *line_tokens = line->tokens;
+                uint8_t *line_end = program_find_line_end(line_tokens);
+                if (pc_after_for >= line_tokens && pc_after_for < line_end) {
+                    g_vm.current_line = line->line_num;
+                    break;
+                }
+                line = program_next_line(line);
+            }
+            
+            return; /* Don't advance PC normally */
+        }
+        /* Loop finished - continue to next statement */
+        break;
     }
 
     case T_END:
