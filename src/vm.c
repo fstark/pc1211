@@ -301,6 +301,297 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         return -parse_factor(pc_ptr, end);
     }
 
+    /* Math functions */
+    case T_SIN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return sin(arg);
+    }
+
+    case T_COS:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return cos(arg);
+    }
+
+    case T_TAN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return tan(arg);
+    }
+
+    case T_ASN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg < -1.0 || arg > 1.0)
+        {
+            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            return 0.0;
+        }
+        return asin(arg);
+    }
+
+    case T_ACS:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg < -1.0 || arg > 1.0)
+        {
+            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            return 0.0;
+        }
+        return acos(arg);
+    }
+
+    case T_ATN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return atan(arg);
+    }
+
+    case T_LOG:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg <= 0.0)
+        {
+            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            return 0.0;
+        }
+        return log10(arg);
+    }
+
+    case T_LN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg <= 0.0)
+        {
+            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            return 0.0;
+        }
+        return log(arg);
+    }
+
+    case T_EXP:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        double result = exp(arg);
+        if (!isfinite(result))
+        {
+            error_set(ERR_MATH_OVERFLOW, g_vm.current_line);
+            return 0.0;
+        }
+        return result;
+    }
+
+    case T_SQR:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg < 0.0)
+        {
+            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            return 0.0;
+        }
+        return sqrt(arg);
+    }
+
+    case T_ABS:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return fabs(arg);
+    }
+
+    case T_INT:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        return floor(arg);
+    }
+
+    case T_SGN:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        if (arg < 0.0)
+            return -1.0;
+        else if (arg > 0.0)
+            return 1.0;
+        else
+            return 0.0;
+    }
+
+    case T_DMS:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        
+        /* Convert decimal degrees to DD.MMSS format */
+        double degrees = floor(fabs(arg));
+        double decimal_part = fabs(arg) - degrees;
+        double total_minutes = decimal_part * 60.0;
+        double minutes = floor(total_minutes);
+        double decimal_seconds = (total_minutes - minutes) * 60.0;
+        
+        /* Format as DD.MMSS with fractional seconds */
+        double result = degrees + (minutes / 100.0) + (decimal_seconds / 10000.0);
+        
+        /* Preserve sign */
+        return (arg < 0.0) ? -result : result;
+    }
+
+    case T_DEG:
+    {
+        (*pc_ptr)++;
+        if (**pc_ptr != T_LP)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return 0.0;
+        }
+        (*pc_ptr)++;
+        double arg = parse_expression(pc_ptr, end);
+        if (**pc_ptr == T_RP)
+            (*pc_ptr)++;
+        
+        /* Convert DD.MMSS format to decimal degrees */
+        double abs_arg = fabs(arg);
+        double degrees = floor(abs_arg);
+        double fractional = abs_arg - degrees;
+        
+        /* Extract minutes (digits 1-2 after decimal) */
+        double minutes_part = fractional * 100.0;
+        double minutes = floor(minutes_part);
+        
+        /* Extract seconds (digits 3-4 and beyond after decimal) */
+        double seconds_part = (minutes_part - minutes) * 100.0;
+        
+        /* Convert to decimal degrees */
+        double result = degrees + (minutes / 60.0) + (seconds_part / 3600.0);
+        
+        /* Preserve sign */
+        return (arg < 0.0) ? -result : result;
+    }
+
     default:
         error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
         return 0.0;

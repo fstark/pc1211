@@ -1,0 +1,18 @@
+10 REM Phase 6 Test: DMS/DEG Conversions
+20 PRINT "=== DMS/DEG Conversion Tests ==="
+30 PRINT "DMS(15.4125)=", DMS(15.4125)
+40 PRINT "Expected: 15.2445"
+50 PRINT "DEG(15.2445)=", DEG(15.2445)
+60 PRINT "Expected: 15.4125"
+70 REM
+80 PRINT "=== Round Trip Tests ==="
+90 PRINT "DEG(DMS(30.75))=", DEG(DMS(30.75))
+100 PRINT "Expected: 30.75"
+110 PRINT "DMS(DEG(45.3030))=", DMS(DEG(45.3030))
+120 PRINT "Expected: 45.3030"
+130 REM
+140 PRINT "=== Edge Cases ==="
+150 PRINT "DMS(0)=", DMS(0)
+160 PRINT "DEG(0)=", DEG(0)
+170 PRINT "DMS(-15.4125)=", DMS(-15.4125)
+180 PRINT "DEG(-15.2445)=", DEG(-15.2445)

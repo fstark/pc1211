@@ -188,7 +188,7 @@ Mixed `INPUT A, A(27), B`.
 - `DMS/DEG` round trips: `DEG(DMS(15.4125)) = 15.4125`.
 
 **Exit criteria:** All functions callable in expressions; no crashes on
-domain errors; DMS/DEG conversions work correctly.
+domain errors; DMS/DEG conversions work correctly. ✅ **COMPLETED**
 
 ------------------------------------------------------------------------
 
