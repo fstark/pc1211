@@ -1,0 +1,55 @@
+# PC-1211 BASIC Interpreter Makefile
+
+CC = gcc
+CFLAGS = -std=c99 -Wall -Wextra -Werror -pedantic -fno-builtin -g
+TARGET = pc1211
+SRCDIR = .
+TESTDIR = tests
+
+# Source files
+SOURCES = main.c program.c tokenizer.c runtime.c vm.c errors.c
+OBJECTS = $(SOURCES:.c=.o)
+
+# Test files
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.c)
+TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
+
+.PHONY: all clean test help
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Test runner (when implemented)
+test: $(TARGET)
+	@echo "Test runner not implemented yet"
+	@echo "You can test manually with sample BASIC programs"
+
+clean:
+	rm -f $(OBJECTS) $(TEST_OBJECTS) $(TARGET)
+
+help:
+	@echo "PC-1211 BASIC Interpreter Build System"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all     - Build the interpreter (default)"
+	@echo "  clean   - Remove object files and executable"
+	@echo "  test    - Run test suite (not implemented yet)"
+	@echo "  help    - Show this help"
+	@echo ""
+	@echo "Usage examples:"
+	@echo "  make"
+	@echo "  ./pc1211 program.bas --list"
+	@echo "  ./pc1211 program.bas --dump"
+
+# Dependencies (basic - could be auto-generated)
+main.o: main.c opcodes.h program.h tokenizer.h runtime.h vm.h errors.h
+program.o: program.c program.h opcodes.h errors.h
+tokenizer.o: tokenizer.c tokenizer.h program.h opcodes.h errors.h
+runtime.o: runtime.c runtime.h program.h opcodes.h errors.h
+vm.o: vm.c vm.h program.h opcodes.h errors.h
+errors.o: errors.c errors.h opcodes.h

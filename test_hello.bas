@@ -1,0 +1,5 @@
+10 REM Hello World Program
+20 A=42
+30 PRINT "HELLO WORLD"
+40 PRINT A
+50 END

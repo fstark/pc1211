@@ -1,0 +1,7 @@
+10 REM Math and functions
+20 A=SIN(3.14159/2)
+30 B=SQR(16)
+40 C=INT(-3.7)
+50 PRINT A, B, C
+60 PRINT ABS(-5), SGN(0)
+70 END
