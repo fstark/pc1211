@@ -62,4 +62,10 @@ void var_set_str(int index, const char *value);
 uint8_t *token_skip(uint8_t *token);             /* Skip one token, return next */
 void token_dump(const uint8_t *tokens, int len); /* Debug dump */
 
+/* VM helper functions */
+uint8_t *program_find_line_tokens(uint16_t line_num); /* Get token start for line */
+uint8_t *program_find_line_end(uint8_t *tokens);      /* Find end of current line */
+uint8_t *program_first_line_tokens(void);             /* Get first line tokens */
+uint8_t *program_next_line_tokens(uint8_t *current);  /* Get next line tokens */
+
 #endif /* PROGRAM_H */

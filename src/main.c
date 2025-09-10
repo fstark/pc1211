@@ -15,7 +15,7 @@ void print_usage(const char *program_name)
     printf("Options:\n");
     printf("  --list    Show program listing\n");
     printf("  --dump    Show token dump (debug)\n");
-    printf("  --run     Execute program (not implemented yet)\n");
+    printf("  --run     Execute program\n");
     printf("  --help    Show this help\n");
 }
 

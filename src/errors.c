@@ -64,3 +64,37 @@ void error_report(ErrorCode code, int line_number)
 
     exit(1);
 }
+
+/* Set error without halting */
+void error_set(ErrorCode code, int line_number)
+{
+    g_last_error = code;
+    g_error_line = line_number;
+}
+
+/* Get current error code */
+ErrorCode error_get_code(void)
+{
+    return g_last_error;
+}
+
+/* Clear error state */
+void error_clear(void)
+{
+    g_last_error = ERR_NONE;
+    g_error_line = 0;
+}
+
+/* Print current error */
+void error_print(void)
+{
+    if (g_last_error != ERR_NONE)
+    {
+        fprintf(stderr, "Error %d", (int)g_last_error);
+        if (g_error_line > 0)
+        {
+            fprintf(stderr, " at line %d", g_error_line);
+        }
+        fprintf(stderr, ": %s\n", error_message(g_last_error));
+    }
+}

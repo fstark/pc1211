@@ -330,3 +330,69 @@ void token_dump(const uint8_t *tokens, int len)
         printf("  %02X (EOL)\n", T_EOL);
     }
 }
+
+/* VM helper functions */
+
+/* Get token start for line */
+uint8_t *program_find_line_tokens(uint16_t line_num)
+{
+    LineRecord *record = program_find_line(line_num);
+    return record ? record->tokens : NULL;
+}
+
+/* Find end of current line (find T_EOL) */
+uint8_t *program_find_line_end(uint8_t *tokens)
+{
+    if (!tokens)
+        return NULL;
+
+    uint8_t *pos = tokens;
+    uint8_t *prog_end = g_program.prog + g_program.prog_len;
+
+    while (pos < prog_end && *pos != T_EOL)
+    {
+        pos = token_skip(pos);
+        if (!pos)
+            break;
+    }
+
+    return pos;
+}
+
+/* Get first line tokens */
+uint8_t *program_first_line_tokens(void)
+{
+    LineRecord *record = program_first_line();
+    return record ? record->tokens : NULL;
+}
+
+/* Get next line tokens */
+uint8_t *program_next_line_tokens(uint8_t *current)
+{
+    if (!current)
+        return NULL;
+
+    /* Find the LineRecord that contains this token pointer */
+    uint8_t *pos = g_program.prog;
+    uint8_t *prog_end = g_program.prog + g_program.prog_len;
+
+    while (pos < prog_end)
+    {
+        uint16_t len = *(uint16_t *)pos;
+        uint8_t *tokens = pos + 4;
+
+        if (tokens <= current && current < tokens + len - 4)
+        {
+            /* Found current line, get next */
+            pos += len;
+            if (pos >= prog_end)
+                return NULL;
+
+            return pos + 4; /* Skip header of next line */
+        }
+
+        pos += len;
+    }
+
+    return NULL;
+}
