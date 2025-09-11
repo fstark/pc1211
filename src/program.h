@@ -32,11 +32,11 @@ typedef struct
 /* Program memory structure */
 typedef struct
 {
-    uint8_t prog[PROG_MAX_BYTES]; /* Token buffer */
-    int prog_len;                 /* Current program size */
-    VarCell vars[VARS_MAX + 1];   /* Variables 1..VARS_MAX (0 unused) */
+    uint8_t prog[PROG_MAX_BYTES];  /* Token buffer */
+    int prog_len;                  /* Current program size */
+    VarCell vars[VARS_MAX + 1];    /* Variables 1..VARS_MAX (0 unused) */
     LabelEntry labels[LABELS_MAX]; /* Label table */
-    int label_count;              /* Number of labels defined */
+    int label_count;               /* Number of labels defined */
 } Program;
 
 /* Line record format: u16 len | u16 line | tokens... | T_EOL */

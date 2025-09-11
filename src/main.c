@@ -130,6 +130,12 @@ int main(int argc, char *argv[])
     {
         printf("\nExecuting program:\n");
         vm_run();
+
+        /* Return non-zero exit code if there were errors during execution */
+        if (error_get_code() != ERR_NONE)
+        {
+            return 1;
+        }
     }
 
     /* If no specific action requested, just show that we loaded it */

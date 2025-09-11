@@ -25,19 +25,15 @@ class TestResult:
         self.expected_to_fail = self._determine_expected_outcome()
     
     def _determine_expected_outcome(self) -> bool:
-        """Determine if this test is expected to fail based on naming patterns"""
-        fail_patterns = [
-            'error', 'fail', 'domain', 'overflow', 'invalid', 'bad',
-            'test_error', 'test_domain', 'debug_'  # debug files often test edge cases
-        ]
-        
-        # INPUT tests will timeout waiting for user input - this is expected
-        input_patterns = ['input', 'computed_debug']  # computed_debug has infinite loop
-        
-        is_expected_fail = any(pattern in self.name.lower() for pattern in fail_patterns)
-        is_input_test = any(pattern in self.name.lower() for pattern in input_patterns)
-        
-        return is_expected_fail or is_input_test
+        """Determine if this test is expected to fail based on explicit naming"""
+        # All test files must end with either _pass.bas or _fail.bas
+        if self.name.endswith('_pass.bas'):
+            return False  # Expected to pass (exit code 0)
+        elif self.name.endswith('_fail.bas'):
+            return True   # Expected to fail (non-zero exit code)
+        else:
+            # This should never happen - test harness should refuse to run
+            raise ValueError(f"Test file {self.name} must end with either '_pass.bas' or '_fail.bas'")
     
     def is_success(self) -> bool:
         """Test succeeded if exit code matches expectation"""
@@ -75,7 +71,8 @@ class TestHarness:
         """Run a single test file and capture results"""
         import time
         
-        print(f"Running {test_file.name}...", end=" ", flush=True)
+        # Use the test file path as-is since it's already relative to the workspace
+        print(f"Running {test_file}...", end=" ", flush=True)
         
         start_time = time.time()
         try:
@@ -83,12 +80,12 @@ class TestHarness:
                 [str(self.pc1211_path), str(test_file), "--run"],
                 capture_output=True,
                 text=True,
-                timeout=10  # 10 second timeout
+                timeout=0.5  # 500ms timeout for faster testing
             )
             execution_time = time.time() - start_time
             
             test_result = TestResult(
-                name=test_file.name,
+                name=str(test_file),
                 exit_code=result.returncode,
                 stdout=result.stdout,
                 stderr=result.stderr,
@@ -126,6 +123,20 @@ class TestHarness:
         """Run all tests and collect results"""
         test_files = self.find_test_files()
         
+        # Validate all test files have proper naming
+        invalid_files = []
+        for test_file in test_files:
+            if not (test_file.name.endswith('_pass.bas') or test_file.name.endswith('_fail.bas')):
+                invalid_files.append(test_file.name)
+        
+        if invalid_files:
+            print("ERROR: The following test files do not end with '_pass.bas' or '_fail.bas':")
+            for filename in invalid_files:
+                print(f"  - {filename}")
+            print("\nAll test files must be explicitly named to indicate expected outcome.")
+            print("Please rename them with either '_pass.bas' or '_fail.bas' suffix.")
+            sys.exit(1)
+        
         if not self.pc1211_path.exists():
             print(f"Error: PC-1211 interpreter not found at {self.pc1211_path}")
             print("Please build it first: gcc -Wall -Wextra -O2 -o src/pc1211 src/*.c")
@@ -136,45 +147,67 @@ class TestHarness:
         
         self.results = []
         for test_file in test_files:
-            result = self.run_single_test(test_file)
-            self.results.append(result)
+            try:
+                result = self.run_single_test(test_file)
+                self.results.append(result)
+            except Exception as e:
+                print(f"CRITICAL ERROR running test {test_file}: {e}")
+                print(f"This test will be missing from results - this is the bug!")
+                # Create a dummy failed result so the test isn't silently dropped
+                dummy_result = TestResult(
+                    name=str(test_file),
+                    exit_code=-999,
+                    stdout="",
+                    stderr=f"Critical test harness error: {e}",
+                    execution_time=0.0
+                )
+                self.results.append(dummy_result)
         
         self.print_summary()
     
     def print_summary(self) -> None:
         """Print test run summary"""
         total_tests = len(self.results)
-        passed_tests = sum(1 for r in self.results if r.is_success())
-        failed_tests = total_tests - passed_tests
         
-        expected_failures = sum(1 for r in self.results if r.expected_to_fail)
-        unexpected_failures = sum(1 for r in self.results if not r.is_success() and not r.expected_to_fail)
+        # Categorize results properly
+        expected_passes = []    # Should pass and did pass
+        expected_failures = []  # Should fail and did fail  
+        unexpected_failures = [] # Should pass but failed
+        unexpected_passes = []   # Should fail but passed
+        
+        for r in self.results:
+            if r.expected_to_fail:
+                if r.is_success():
+                    expected_failures.append(r)
+                else:
+                    unexpected_passes.append(r)
+            else:
+                if r.is_success():
+                    expected_passes.append(r)
+                else:
+                    unexpected_failures.append(r)
         
         print("=" * 60)
         print("TEST SUMMARY")
         print("=" * 60)
-        print(f"Total tests:           {total_tests}")
-        print(f"Passed:                {passed_tests}")
-        print(f"Failed:                {failed_tests}")
-        print(f"Expected failures:     {expected_failures}")
-        print(f"Unexpected failures:   {unexpected_failures}")
+        print(f"Total tests:             {total_tests}")
+        print(f"Expected passes:         {len(expected_passes)}")
+        print(f"Expected failures:       {len(expected_failures)}")
+        print(f"Unexpected failures:     {len(unexpected_failures)}")
+        print(f"Unexpected passes:       {len(unexpected_passes)}")
         print()
         
-        if unexpected_failures > 0:
-            print("UNEXPECTED FAILURES:")
-            for result in self.results:
-                if not result.is_success() and not result.expected_to_fail:
-                    print(f"  - {result.name} (exit code: {result.exit_code})")
+        if len(unexpected_failures) > 0:
+            print("UNEXPECTED FAILURES (should have passed):")
+            for result in unexpected_failures:
+                print(f"  - {result.name} (exit code: {result.exit_code})")
             print()
-        
-        # Show some example outputs
-        print("SAMPLE OUTPUTS:")
-        for i, result in enumerate(self.results[:3]):
-            print(f"\n--- {result.name} ---")
-            print(f"Exit code: {result.exit_code}")
-            if result.stdout:
-                print("Output:")
-                print(result.stdout[:200] + ("..." if len(result.stdout) > 200 else ""))
+            
+        if len(unexpected_passes) > 0:
+            print("UNEXPECTED PASSES (should have failed):")
+            for result in unexpected_passes:
+                print(f"  - {result.name} (exit code: {result.exit_code})")
+            print()
     
     def save_reference(self) -> None:
         """Save current test results as reference for future comparison"""

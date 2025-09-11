@@ -1,7 +1,7 @@
 # PC-1211 BASIC Interpreter Makefile
 
 CC = gcc
-CFLAGS = -std=c99 -Wall -Wextra -Werror -pedantic -fno-builtin -g
+CFLAGS = -std=c99 -Wall -Wextra -Werror -pedantic -fno-builtin -g -gdwarf-4 -fno-omit-frame-pointer -fstandalone-debug
 TARGET = pc1211
 SRCDIR = .
 TESTDIR = tests

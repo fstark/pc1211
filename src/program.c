@@ -430,7 +430,7 @@ void program_add_label(const char *label, uint16_t line_num)
 {
     if (g_program.label_count >= LABELS_MAX)
         return; /* Silently ignore if table full */
-    
+
     /* Check if label already exists and update it */
     for (int i = 0; i < g_program.label_count; i++)
     {
@@ -440,7 +440,7 @@ void program_add_label(const char *label, uint16_t line_num)
             return;
         }
     }
-    
+
     /* Add new label */
     strncpy(g_program.labels[g_program.label_count].label, label, STR_MAX);
     g_program.labels[g_program.label_count].label[STR_MAX] = '\0';

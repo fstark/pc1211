@@ -8,7 +8,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/debug_expr_goto.bas\nLoaded 5 lines\n\nExecuting program:\nA= 100\nREACHED LINE 100\n",
       "stderr": "",
-      "execution_time": 0.009795665740966797,
+      "execution_time": 0.010671854019165039,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "98dfd565d1cda5c08a2805c171c2a02d"
@@ -18,7 +18,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/debug_goto_test.bas\nLoaded 17 lines\n\nExecuting program:\nGOTO WITH VARIABLE WORKED!\nGOSUB WITH EXPRESSION WORKED!\nBACK FROM GOSUB\nGOTO WITH COMPLEX EXPRESSION WORKED!\n",
       "stderr": "",
-      "execution_time": 0.006863117218017578,
+      "execution_time": 0.006541013717651367,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "3a1fba1ce1c0d52c99093daf2a256b97"
@@ -28,7 +28,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/debug_label_goto.bas\nLoaded 3 lines\n\nExecuting program:\nREACHED LABEL\n",
       "stderr": "",
-      "execution_time": 0.006693124771118164,
+      "execution_time": 0.007054805755615234,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "bf211898ca1e61473e24c8f6dd9a7b6b"
@@ -38,7 +38,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/debug_simple.bas\nLoaded 9 lines\n\nExecuting program:\nLINE 20\nZ= 140\nREACHED LINE 240\nREACHED LINE 250\n",
       "stderr": "",
-      "execution_time": 0.008526802062988281,
+      "execution_time": 0.00886392593383789,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "3a563d822c4a032abd8f779546ec168b"
@@ -48,7 +48,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/line240_test.bas\nLoaded 5 lines\n\nExecuting program:\nTEST LINE 240 ISSUE\nREACHED LINE 240\n",
       "stderr": "",
-      "execution_time": 0.007719993591308594,
+      "execution_time": 0.007330179214477539,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "02f97e56e03dc77dd2824a2d2734ba61"
@@ -58,7 +58,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/minimal_gosub_test.bas\nLoaded 7 lines\n\nExecuting program:\nSTARTING GOSUB TEST\nIN SUBROUTINE\nBACK FROM GOSUB\n",
       "stderr": "",
-      "execution_time": 0.006191253662109375,
+      "execution_time": 0.009036064147949219,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "8f96a9b82e00f6ab201fda23a01d51f4"
@@ -68,7 +68,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/minimal_goto_test.bas\nLoaded 6 lines\n\nExecuting program:\nSTARTING TEST\nREACHED LINE 150\n",
       "stderr": "",
-      "execution_time": 0.009905815124511719,
+      "execution_time": 0.009558916091918945,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "b991ffeaad777145cf99308419e1330a"
@@ -78,7 +78,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/svidx_debug.bas\nLoaded 3 lines\n\nExecuting program:\nBEFORE ASSIGNMENT\nAFTER ASSIGNMENT, A$(5)= TEST\n",
       "stderr": "",
-      "execution_time": 0.007893085479736328,
+      "execution_time": 0.007921934127807617,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "1bae0bd4e35e36fc68f26f22dec02a81"
@@ -88,7 +88,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_abbrev.bas\nLoaded 6 lines\n\nExecuting program:\n2.65359e-06\nSHORT PRINT\nTARGET LINE\n",
       "stderr": "",
-      "execution_time": 0.007484912872314453,
+      "execution_time": 0.007502079010009766,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "0e5b9df3c1eda3e470243c5357401692"
@@ -98,7 +98,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_complex_goto.bas\nLoaded 10 lines\n\nExecuting program:\nTESTING COMPLEX GOTO/GOSUB EXPRESSIONS\nGOTO EXPRESSION A*B+50 WORKED!\nGOSUB EXPRESSION C+A WORKED!\nBACK FROM GOSUB EXPRESSION\n",
       "stderr": "",
-      "execution_time": 0.009211063385009766,
+      "execution_time": 0.006639003753662109,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "ea38c3392cdcbc72c03a3d66f7700810"
@@ -108,7 +108,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_comprehensive.bas\nLoaded 16 lines\n\nExecuting program:\nNUMBERS: 42.5 3.14159\nSTRING: HELLO\nLOOP: 1\nLOOP: 2\nLOOP: 3\nIN SUBROUTINE\nBACK FROM SUBROUTINE\n",
       "stderr": "",
-      "execution_time": 0.006897926330566406,
+      "execution_time": 0.007723808288574219,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "3fd022ed328dfb4800671f3c15b6f227"
@@ -118,7 +118,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_comprehensive_goto.bas\nLoaded 39 lines\n\nExecuting program:\n=== PC-1211 GOTO/GOSUB COMPREHENSIVE TEST ===\n\n1. EXPRESSION GOTO:\n   EXPRESSION GOTO WORKS!\n\n2. STRING LITERAL GOTO:\n   STRING LITERAL GOTO WORKS!\n\n3. COMPUTED GOTO (STRING VARIABLE):\n   COMPUTED GOTO WORKS!\n\n4. EXPRESSION GOSUB:\n\n=== ALL TESTS PASSED! ===\n",
       "stderr": "",
-      "execution_time": 0.008292913436889648,
+      "execution_time": 0.009764671325683594,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "fc47e9749d818cebbc32a2f9c201fba7"
@@ -128,7 +128,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_comprehensive_labels.bas\nLoaded 14 lines\n\nExecuting program:\nLABEL SUPPORT WORKING\nLABELED SUBROUTINE\nNUMBERED SUBROUTINE\nLOOP ITERATION: 1\nLOOP ITERATION: 2\nLOOP ITERATION: 3\nLOOP FINISHED\nALL TESTS PASSED!\n",
       "stderr": "",
-      "execution_time": 0.008831262588500977,
+      "execution_time": 0.006540775299072266,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "c4081c2fc2a02bfa5dc29131ce4daee6"
@@ -138,7 +138,7 @@
       "exit_code": -1,
       "stdout": "",
       "stderr": "Test timed out after 10 seconds",
-      "execution_time": 10.28925895690918,
+      "execution_time": 0.51395583152771,
       "expected_to_fail": true,
       "success": true,
       "output_hash": "d41d8cd98f00b204e9800998ecf8427e"
@@ -148,7 +148,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_computed_gosub.bas\nLoaded 6 lines\n\nExecuting program:\nCALLING SUBROUTINE: SUB1\nIN SUBROUTINE\nBACK FROM SUBROUTINE\n",
       "stderr": "",
-      "execution_time": 0.023522138595581055,
+      "execution_time": 0.008579254150390625,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a82a5fb5ad8a14350279a5a7de0449b7"
@@ -158,7 +158,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_computed_goto.bas\nLoaded 5 lines\n\nExecuting program:\nA$= EXIT\nSUCCESSFULLY COMPUTED GOTO!\n",
       "stderr": "",
-      "execution_time": 0.015453100204467773,
+      "execution_time": 0.008322000503540039,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "f735c6845f019326f3f44a9347bfd431"
@@ -168,7 +168,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_computed_label.bas\nLoaded 4 lines\n\nExecuting program:\nHELLO\n",
       "stderr": "",
-      "execution_time": 0.01593494415283203,
+      "execution_time": 0.011338949203491211,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "120617ff3f415f3c1c74b86d00869712"
@@ -178,7 +178,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_debug_string.bas\nLoaded 5 lines\n\nExecuting program:\nA$= FOO\nHELLO\n",
       "stderr": "",
-      "execution_time": 0.016414880752563477,
+      "execution_time": 0.008397102355957031,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "309f8ed6bd24fda2416ddc4f762f8901"
@@ -188,7 +188,7 @@
       "exit_code": 1,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_domain_individual.bas\n",
       "stderr": "Error 11 at line 20: Syntax error\n",
-      "execution_time": 0.015319108963012695,
+      "execution_time": 0.009937763214111328,
       "expected_to_fail": true,
       "success": true,
       "output_hash": "641f8826072ac86ef1f4fcd556f5ebee"
@@ -198,7 +198,7 @@
       "exit_code": 1,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_error.bas\n",
       "stderr": "Invalid line number in: 2000 PRINT \"This should fail\"\nFailed to load program\n",
-      "execution_time": 0.014297008514404297,
+      "execution_time": 0.008430957794189453,
       "expected_to_fail": true,
       "success": true,
       "output_hash": "829ae53c99c6b200fb61176db7083610"
@@ -208,7 +208,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_basic.bas\nLoaded 5 lines\n\nExecuting program:\n1\n2\n3\nDONE\n",
       "stderr": "",
-      "execution_time": 0.015793323516845703,
+      "execution_time": 0.01045989990234375,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "6918591ded5080d7f15be82b566886f4"
@@ -218,7 +218,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_negative.bas\nLoaded 5 lines\n\nExecuting program:\n5\n4\n3\n2\n1\nDONE\n",
       "stderr": "",
-      "execution_time": 0.014988183975219727,
+      "execution_time": 0.010306119918823242,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "259520f0e5b60381888d50df287e2288"
@@ -228,7 +228,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_nested.bas\nLoaded 7 lines\n\nExecuting program:\n1 1\n1 2\n2 1\n2 2\nDONE\n",
       "stderr": "",
-      "execution_time": 0.01601696014404297,
+      "execution_time": 0.007625102996826172,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "09b581ef28fcaa66388639bf392b1cf9"
@@ -238,7 +238,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_same_line.bas\nLoaded 4 lines\n\nExecuting program:\n0\n1\n2\n3\n4\n5\nDONE\n",
       "stderr": "",
-      "execution_time": 0.015591859817504883,
+      "execution_time": 0.009905815124511719,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "c0ff3162099985e1a984b67a4a07904f"
@@ -248,7 +248,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_step.bas\nLoaded 5 lines\n\nExecuting program:\n1\n3\n5\n7\n9\nDONE\n",
       "stderr": "",
-      "execution_time": 0.015658855438232422,
+      "execution_time": 0.0064852237701416016,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a61596f64e6e6688c51dfd03e71a6233"
@@ -258,7 +258,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_step_zero.bas\nLoaded 4 lines\n\nExecuting program:\n",
       "stderr": "Error 6 at line 10: FOR step cannot be zero\n",
-      "execution_time": 0.015188932418823242,
+      "execution_time": 0.009772777557373047,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "2fbffb82fdc6a18674ed27af1f5fcb94"
@@ -268,7 +268,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_unnamed_next.bas\nLoaded 7 lines\n\nExecuting program:\n1 1\n1 2\n2 1\n2 2\nDONE\n",
       "stderr": "",
-      "execution_time": 0.01635003089904785,
+      "execution_time": 0.007258176803588867,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "7fe4f550ffd7727c89e1305de05aacae"
@@ -278,7 +278,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_for_unstructured.bas\nLoaded 8 lines\n\nExecuting program:\n1\nTWO\n3\nDONE\n",
       "stderr": "",
-      "execution_time": 0.015343904495239258,
+      "execution_time": 0.009435892105102539,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "d37ced97ce798212294cfd928c559bfa"
@@ -288,7 +288,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_gosub.bas\nLoaded 6 lines\n\nExecuting program:\nSTART\nIN SUBROUTINE\nBACK\n",
       "stderr": "",
-      "execution_time": 0.016010046005249023,
+      "execution_time": 0.010081052780151367,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "0cd541e49e102044a2359695e747a93e"
@@ -298,7 +298,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_goto_expression.bas\nLoaded 17 lines\n\nExecuting program:\nGOTO WITH VARIABLE WORKED!\nGOSUB WITH EXPRESSION WORKED!\nBACK FROM GOSUB\nALL GOTO/GOSUB EXPRESSION TESTS PASSED!\n",
       "stderr": "",
-      "execution_time": 0.015553951263427734,
+      "execution_time": 0.008161067962646484,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "e3009cedcad811ae35972a5889f6ce71"
@@ -308,7 +308,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_hello.bas\nLoaded 5 lines\n\nExecuting program:\nHELLO WORLD\n42\n",
       "stderr": "",
-      "execution_time": 0.01640915870666504,
+      "execution_time": 0.007570981979370117,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "766b62911f24e6ee9d67e6c1c337012e"
@@ -318,7 +318,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_if_both.bas\nLoaded 8 lines\n\nExecuting program:\nA IS 3\nB IS SMALL\nDONE\n",
       "stderr": "",
-      "execution_time": 0.014580011367797852,
+      "execution_time": 0.009714841842651367,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "67a2e4b76ed29e09b42b8a137674cb46"
@@ -328,7 +328,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_if_inline.bas\nLoaded 3 lines\n\nExecuting program:\n",
       "stderr": "Error 11 at line 20: Syntax error\n",
-      "execution_time": 0.01685190200805664,
+      "execution_time": 0.011599063873291016,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "36601117208b33a7af713c69b9c39366"
@@ -338,7 +338,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_if_simple.bas\nLoaded 4 lines\n\nExecuting program:\nYES\nDONE\n",
       "stderr": "",
-      "execution_time": 0.016251802444458008,
+      "execution_time": 0.008067846298217773,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "d6a1a6abb0ff698d453edf0db31b1b21"
@@ -348,7 +348,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_indexed.bas\nLoaded 5 lines\n\nExecuting program:\n42 99\n",
       "stderr": "",
-      "execution_time": 0.015676021575927734,
+      "execution_time": 0.008923768997192383,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "d92e8e2d5f8a032dbb6be4398741b32f"
@@ -358,7 +358,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_indexed_string.bas\nLoaded 4 lines\n\nExecuting program:\nHELLO\n",
       "stderr": "Error 5 at line 40: Type mismatch\n",
-      "execution_time": 0.015252351760864258,
+      "execution_time": 0.00885009765625,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "43ba924501dc3fc64f1fa2fdcf2d6ca2"
@@ -368,7 +368,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_indexed_vars.bas\nLoaded 6 lines\n\nExecuting program:\nFIRST\nSECOND\n",
       "stderr": "",
-      "execution_time": 0.014733076095581055,
+      "execution_time": 0.009612083435058594,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a1a0541a43dad7c0855aff09c8ef1f1b"
@@ -378,7 +378,7 @@
       "exit_code": -1,
       "stdout": "",
       "stderr": "Test timed out after 10 seconds",
-      "execution_time": 10.013845920562744,
+      "execution_time": 0.5059208869934082,
       "expected_to_fail": true,
       "success": true,
       "output_hash": "d41d8cd98f00b204e9800998ecf8427e"
@@ -388,7 +388,7 @@
       "exit_code": -1,
       "stdout": "",
       "stderr": "Test timed out after 10 seconds",
-      "execution_time": 10.016655206680298,
+      "execution_time": 0.5067288875579834,
       "expected_to_fail": true,
       "success": true,
       "output_hash": "d41d8cd98f00b204e9800998ecf8427e"
@@ -398,7 +398,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_invalid_assign.bas\nLoaded 3 lines\n\nExecuting program:\n",
       "stderr": "Error 11 at line 20: Syntax error\n",
-      "execution_time": 0.020852088928222656,
+      "execution_time": 0.008287906646728516,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "222f191be6b760dba39640e42ba1e9d2"
@@ -408,7 +408,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_invalid_string_index.bas\nLoaded 4 lines\n\nExecuting program:\n",
       "stderr": "Error 11 at line 30: Syntax error\n",
-      "execution_time": 0.013866901397705078,
+      "execution_time": 0.008424997329711914,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "466bc9de4a12609237c70ca27ec2e4fe"
@@ -418,7 +418,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_label_error.bas\nLoaded 3 lines\n\nExecuting program:\nTESTING ERROR HANDLING\n",
       "stderr": "Error 11 at line 20: Syntax error\n",
-      "execution_time": 0.015519380569458008,
+      "execution_time": 0.006654977798461914,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "6b7b437b92ababfd5ee830828967a5c7"
@@ -428,7 +428,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_label_formats.bas\nLoaded 3 lines\n\nExecuting program:\nLABEL WITHOUT COLON WORKS\nLABEL WITH COLON ALSO WORKS\n",
       "stderr": "",
-      "execution_time": 0.019527196884155273,
+      "execution_time": 0.008530855178833008,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "6d3491fbeec6b9d5fddcf5f4a3391302"
@@ -438,7 +438,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_labels.bas\nLoaded 11 lines\n\nExecuting program:\nBEGINNING PROGRAM\nREACHED MIDDLE\nIN SUBROUTINE 1\nBACK FROM SUBROUTINE\nPROGRAM FINISHED\n",
       "stderr": "",
-      "execution_time": 0.016757965087890625,
+      "execution_time": 0.012397050857543945,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a70cb3de837715bfd9b8c290ba657b76"
@@ -448,7 +448,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_literal_goto.bas\nLoaded 9 lines\n\nExecuting program:\nTESTING BACKWARD COMPATIBILITY\nLITERAL GOTO STILL WORKS!\nLITERAL GOSUB STILL WORKS!\nBACK FROM LITERAL GOSUB\n",
       "stderr": "",
-      "execution_time": 0.017575979232788086,
+      "execution_time": 0.010741949081420898,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "2430c8636b68d5e1134d1dae01f59047"
@@ -458,7 +458,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_math.bas\nLoaded 7 lines\n\nExecuting program:\n1 4 -4\n5 0\n",
       "stderr": "",
-      "execution_time": 0.018656015396118164,
+      "execution_time": 0.013534307479858398,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "c856885c28c2c413c6eda524c353a05a"
@@ -468,7 +468,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_minimal.bas\nLoaded 1 lines\n\nExecuting program:\n",
       "stderr": "",
-      "execution_time": 0.017481088638305664,
+      "execution_time": 0.010990142822265625,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "22c42afab91025c42b208a2e82e347a8"
@@ -478,7 +478,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_mixed_labels.bas\nLoaded 17 lines\n\nExecuting program:\nTESTING MIXED LABELS AND LINE NUMBERS\nAT LABEL1\nAT LINE 80\nIN LABELED SUBROUTINE\nBACK FROM LABELED SUBROUTINE\nIN NUMBERED SUBROUTINE\nBACK FROM NUMBERED SUBROUTINE\n",
       "stderr": "",
-      "execution_time": 0.021821975708007812,
+      "execution_time": 0.00822901725769043,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "d7d951607a88e1d349557e7146956937"
@@ -488,7 +488,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_mixed_vars.bas\nLoaded 10 lines\n\nExecuting program:\nNUMERIC A: 42.5\nSTRING B$: HELLO\nNUMERIC C: 3.14159\nSTRING D$: WORLD\n",
       "stderr": "",
-      "execution_time": 0.01837015151977539,
+      "execution_time": 0.009895801544189453,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "d8be7abc87883d06c60cb26b1810b725"
@@ -498,7 +498,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_next_without_for.bas\nLoaded 2 lines\n\nExecuting program:\n",
       "stderr": "Error 8 at line 10: NEXT without FOR\n",
-      "execution_time": 0.015228748321533203,
+      "execution_time": 0.009549140930175781,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "65d9deeeb12b67c77844c057fb8b63dc"
@@ -508,7 +508,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_numeric_error.bas\nLoaded 3 lines\n\nExecuting program:\nTESTING NUMERIC GOTO ERROR\n",
       "stderr": "Error 10 at line 20: Bad line number\n",
-      "execution_time": 0.018644094467163086,
+      "execution_time": 0.011123895645141602,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "007a08e510e6eb75ffc0ae4b68631d27"
@@ -518,7 +518,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase2_goto.bas\nLoaded 8 lines\n\nExecuting program:\n10 5 25\nDONE\n",
       "stderr": "",
-      "execution_time": 0.018405675888061523,
+      "execution_time": 0.008124113082885742,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a216de2533833663ef8025e2487f118b"
@@ -528,7 +528,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase2_math.bas\nLoaded 5 lines\n\nExecuting program:\n11\n",
       "stderr": "",
-      "execution_time": 0.01658773422241211,
+      "execution_time": 0.008795976638793945,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "bc4e310e18b4faf3babe4286c79fb301"
@@ -538,7 +538,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase3_if.bas\nLoaded 7 lines\n\nExecuting program:\nA IS GREATER\nB EQUALS 3\n",
       "stderr": "",
-      "execution_time": 0.01831197738647461,
+      "execution_time": 0.012534618377685547,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "e825cdb5f4d16da9d2858055b1e521d5"
@@ -548,7 +548,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase5_complete.bas\nLoaded 19 lines\n\nExecuting program:\nA$= HELLO W\nB= 123.45\nB$= GOODBYE\nC$ (TRUNCATED)= TOOLONG\nA(5)= 999\nA$(7)= INDEXED\nAFTER A(5)=999, A$= HELLO W\nAFTER A$=NEWVAL, A(5) IS NOW STRING TYPE\n",
       "stderr": "",
-      "execution_time": 0.016428232192993164,
+      "execution_time": 0.008116960525512695,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "cc1fc96e1064d4213dfb2ae0998e832e"
@@ -558,7 +558,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase6_basic.bas\nLoaded 30 lines\n\nExecuting program:\n=== TRIGONOMETRIC FUNCTIONS ===\nSIN(0)= 0\nCOS(0)= 1\nTAN(0)= 0\nSIN(PI/2)= 1\nCOS(PI/2)= -3.67321e-06\n=== INVERSE TRIG FUNCTIONS ===\nASN(0)= 0\nACS(1)= 0\nATN(1)= 0.785398\n=== LOGARITHMIC FUNCTIONS ===\nLOG(10)= 1\nLOG(100)= 2\nLN(1)= 0\nEXP(0)= 1\nEXP(1)= 2.71828\n=== OTHER MATH FUNCTIONS ===\nSQR(4)= 2\nSQR(9)= 3\nABS(-5)= 5\nABS(5)= 5\nINT(3.7)= 3\nINT(-3.7)= -4\nSGN(-5)= -1\nSGN(0)= 0\nSGN(5)= 1\n",
       "stderr": "",
-      "execution_time": 0.0172879695892334,
+      "execution_time": 0.009763240814208984,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "79df72c64435763bf8555c0da4e23421"
@@ -568,7 +568,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase6_complete.bas\nLoaded 32 lines\n\nExecuting program:\n=== PHASE 6: ALL MATH FUNCTIONS TEST ===\nBASIC TRIG (RADIANS):\nSIN(0)= 0  (EXPECT 0)\nCOS(0)= 1  (EXPECT 1)\nTAN(0)= 0  (EXPECT 0)\nINVERSE TRIG:\nASN(0.5)= 0.523599  (EXPECT ~0.524)\nACS(0.5)= 1.0472  (EXPECT ~1.047)\nATN(1)= 0.785398  (EXPECT ~0.785)\nLOGARITHMS AND EXPONENTIALS:\nLOG(10)= 1  (EXPECT 1)\nLN(2.71828)= 0.999999  (EXPECT ~1)\nEXP(1)= 2.71828  (EXPECT ~2.718)\nOTHER FUNCTIONS:\nSQR(16)= 4  (EXPECT 4)\nABS(-7.5)= 7.5  (EXPECT 7.5)\nINT(4.9)= 4  (EXPECT 4)\nINT(-4.9)= -5  (EXPECT -5)\nSGN(-10)= -1  (EXPECT -1)\nSGN(0)= 0  (EXPECT 0)\nSGN(10)= 1  (EXPECT 1)\nDMS/DEG CONVERSIONS:\nDMS(15.4125)= 15.2445  (EXPECT 15.2445)\nDEG(15.2445)= 15.4125  (EXPECT 15.4125)\n=== ALL FUNCTIONS WORKING ===\n",
       "stderr": "",
-      "execution_time": 0.01739501953125,
+      "execution_time": 0.009955167770385742,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "e2604ed23614897c64287a2324f77739"
@@ -578,7 +578,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase6_dms.bas\nLoaded 18 lines\n\nExecuting program:\n=== DMS/DEG CONVERSION TESTS ===\nDMS(15.4125)= 15.2445\nEXPECTED: 15.2445\nDEG(15.2445)= 15.4125\nEXPECTED: 15.4125\n=== ROUND TRIP TESTS ===\nDEG(DMS(30.75))= 30.7611\nEXPECTED: 30.75\nDMS(DEG(45.3030))= 45.303\nEXPECTED: 45.3030\n=== EDGE CASES ===\nDMS(0)= 0\nDEG(0)= 0\nDMS(-15.4125)= -15.2445\nDEG(-15.2445)= -15.4125\n",
       "stderr": "",
-      "execution_time": 0.016354799270629883,
+      "execution_time": 0.008356094360351562,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "a5a8713707dc17baad313e301f351136"
@@ -588,7 +588,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase6_domain.bas\nLoaded 5 lines\n\nExecuting program:\n=== TESTING DOMAIN ERRORS ===\nTHIS SHOULD GENERATE DOMAIN ERRORS:\nSQR(-1)= ",
       "stderr": "Error 2 at line 40: Math domain error\n",
-      "execution_time": 0.017128944396972656,
+      "execution_time": 0.009637832641601562,
       "expected_to_fail": true,
       "success": false,
       "output_hash": "d751967a4e2fb71e1f83c90d9d2d4ac6"
@@ -598,7 +598,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_phase7_complete.bas\nLoaded 36 lines\n\nExecuting program:\nAREAD CAPTURED: 0\nTESTING ANGLE MODES...\nRADIAN: SIN( 1.57079 )= 1\nDEGREE: SIN(90)= 1\nGRAD: SIN(100)= 1\nDEGREE: ATN(1)= 45  (SHOULD BE 45)\nGRAD: ATN(1)= 50  (SHOULD BE 50)\nBEFORE CLEAR: A= 99  B= 88  A(10)= 77\nAFTER CLEAR: A= 0  B= 0  A(10)= 0\nTESTING BEEP...\n\u0007PAUSING FOR 100MS...\t 123\nAREAD AFTER PAUSE: 0  (SHOULD BE 0)\nPHASE 7 IMPLEMENTATION COMPLETE!\n",
       "stderr": "",
-      "execution_time": 0.12061095237731934,
+      "execution_time": 0.1136021614074707,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "9d740e60a1d850ff9cf6d215b0fe9fc4"
@@ -608,7 +608,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_precision.bas\nLoaded 5 lines\n\nExecuting program:\nZ+100 = 240\nDIRECT GOTO 240 WORKS\n",
       "stderr": "",
-      "execution_time": 0.014842987060546875,
+      "execution_time": 0.0067141056060791016,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "0bcb0126fd51a915c0472048451d0dd3"
@@ -618,7 +618,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_short_label.bas\nLoaded 3 lines\n\nExecuting program:\nTESTING ERROR HANDLING\n",
       "stderr": "Error 10 at line 20: Bad line number\n",
-      "execution_time": 0.019782066345214844,
+      "execution_time": 0.007766008377075195,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "ba240dc1bb08c28bda808842f8d6ec7c"
@@ -628,7 +628,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_simple_gosub.bas\nLoaded 7 lines\n\nExecuting program:\nTESTING GOSUB EXPRESSION\nGOSUB B WORKED!\nBACK FROM GOSUB\n",
       "stderr": "",
-      "execution_time": 0.016527652740478516,
+      "execution_time": 0.00865793228149414,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "9b60478ecf3d6347a744e591fa94029a"
@@ -638,7 +638,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_simple_goto.bas\nLoaded 6 lines\n\nExecuting program:\nTESTING SIMPLE GOTO EXPRESSION\nGOTO A WORKED!\n",
       "stderr": "",
-      "execution_time": 0.015432119369506836,
+      "execution_time": 0.011178970336914062,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "c16df77318d338b458774614026a6773"
@@ -648,7 +648,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_simple_indexed.bas\nLoaded 4 lines\n\nExecuting program:\nHELLO\nWORLD\n",
       "stderr": "",
-      "execution_time": 0.01758289337158203,
+      "execution_time": 0.008975744247436523,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "edd7873785313a5236fef3877fc5a565"
@@ -658,7 +658,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_string_basic.bas\nLoaded 3 lines\n\nExecuting program:\nHELLO\n",
       "stderr": "",
-      "execution_time": 0.016613245010375977,
+      "execution_time": 0.00927424430847168,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "5b512ee5d0b01733cfb478c494adfabb"
@@ -668,7 +668,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_string_truncation.bas\nLoaded 5 lines\n\nExecuting program:\nFULL STRING IN SOURCE: 123456789012345\nVARIABLE A$ CONTAINS: 1234567\n",
       "stderr": "",
-      "execution_time": 0.014220237731933594,
+      "execution_time": 0.008672952651977539,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "e036022f2b55475d7b0c651c15d67f8f"
@@ -678,7 +678,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_string_truncation_indexed.bas\nLoaded 4 lines\n\nExecuting program:\nSHOULD \n",
       "stderr": "",
-      "execution_time": 0.018004179000854492,
+      "execution_time": 0.00883793830871582,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "58665d9f84678b553ab387800756342b"
@@ -688,7 +688,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_strings_advanced.bas\nLoaded 9 lines\n\nExecuting program:\nHELLO   WORLD\nTHISISL\nNOW A S\n",
       "stderr": "Error 5 at line 90: Type mismatch\n",
-      "execution_time": 0.016113996505737305,
+      "execution_time": 0.007214784622192383,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "8a53be0908953a24765b6f914faee814"
@@ -698,7 +698,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_type_overwrite.bas\nLoaded 6 lines\n\nExecuting program:\nA= 123\nA$= HELLO\nA AS STRING= HELLO\n",
       "stderr": "",
-      "execution_time": 0.015095710754394531,
+      "execution_time": 0.010308027267456055,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "ba36859ec65e52a3b91ef04eef7517e5"
@@ -708,7 +708,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_variable.bas\nLoaded 3 lines\n\nExecuting program:\n240\n",
       "stderr": "",
-      "execution_time": 0.019397258758544922,
+      "execution_time": 0.009318828582763672,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "ced818cd5f3317e186c65d0961e097a1"
@@ -718,7 +718,7 @@
       "exit_code": 0,
       "stdout": "PC-1211 BASIC Interpreter v0.5\nLoading: tests/test_vars.bas\nLoaded 7 lines\n\nExecuting program:\n1.5 TEST\nINDEX\n",
       "stderr": "",
-      "execution_time": 0.0162811279296875,
+      "execution_time": 0.007843732833862305,
       "expected_to_fail": false,
       "success": true,
       "output_hash": "aed2dcbf1d35fba8816a94ff50d6df2d"
