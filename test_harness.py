@@ -23,20 +23,34 @@ class TestResult:
         self.stderr = stderr
         self.execution_time = execution_time
         self.expected_to_fail = self._determine_expected_outcome()
+        self.is_timeout = (exit_code == -1 and "timed out" in stderr.lower())
+        self.expected_to_timeout = self.name.endswith('_timeout.bas')
     
     def _determine_expected_outcome(self) -> bool:
         """Determine if this test is expected to fail based on explicit naming"""
-        # All test files must end with either _pass.bas or _fail.bas
+        # All test files must end with either _pass.bas, _fail.bas, or _timeout.bas
         if self.name.endswith('_pass.bas'):
             return False  # Expected to pass (exit code 0)
         elif self.name.endswith('_fail.bas'):
             return True   # Expected to fail (non-zero exit code)
+        elif self.name.endswith('_timeout.bas'):
+            return False  # Expected to timeout (handled separately)
         else:
             # This should never happen - test harness should refuse to run
-            raise ValueError(f"Test file {self.name} must end with either '_pass.bas' or '_fail.bas'")
+            raise ValueError(f"Test file {self.name} must end with '_pass.bas', '_fail.bas', or '_timeout.bas'")
     
     def is_success(self) -> bool:
         """Test succeeded if exit code matches expectation AND output format is correct"""
+        
+        # Expected timeouts are successful if they actually timed out
+        if self.expected_to_timeout:
+            return self.is_timeout
+        
+        # Unexpected timeouts are always failures
+        if self.is_timeout:
+            self.fail_reason = "Test timed out"
+            return False
+        
         # First check for proper output format
         output_lines = self.stdout.strip().split('\n')
         has_pass_fail_marker = False
@@ -127,14 +141,20 @@ class TestHarness:
                 execution_time=execution_time
             )
             
-            status = "PASS" if test_result.is_success() else "FAIL"
-            expected = "(expected)" if test_result.expected_to_fail else ""
-            
             # Display the result
-            if test_result.is_success():
+            if test_result.is_timeout:
+                if test_result.expected_to_timeout:
+                    print(f"TIMEOUT (expected) ({execution_time:.3f}s)")
+                else:
+                    print(f"TIMEOUT ({execution_time:.3f}s)")
+            elif test_result.is_success():
+                status = "PASS"
+                expected = "(expected)" if test_result.expected_to_fail else ""
                 print(f"{status} {expected} ({execution_time:.3f}s)")
             else:
                 # Test failed - show the reason
+                status = "FAIL"
+                expected = "(expected)" if test_result.expected_to_fail else ""
                 reason = getattr(test_result, 'fail_reason', 'Unknown failure')
                 print(f"{status} {expected} ({execution_time:.3f}s)")
                 if reason and not test_result.expected_to_fail:
@@ -175,15 +195,15 @@ class TestHarness:
         # Validate all test files have proper naming
         invalid_files = []
         for test_file in test_files:
-            if not (test_file.name.endswith('_pass.bas') or test_file.name.endswith('_fail.bas')):
+            if not (test_file.name.endswith('_pass.bas') or test_file.name.endswith('_fail.bas') or test_file.name.endswith('_timeout.bas')):
                 invalid_files.append(test_file.name)
         
         if invalid_files:
-            print("ERROR: The following test files do not end with '_pass.bas' or '_fail.bas':")
+            print("ERROR: The following test files do not end with '_pass.bas', '_fail.bas', or '_timeout.bas':")
             for filename in invalid_files:
                 print(f"  - {filename}")
             print("\nAll test files must be explicitly named to indicate expected outcome.")
-            print("Please rename them with either '_pass.bas' or '_fail.bas' suffix.")
+            print("Please rename them with either '_pass.bas', '_fail.bas', or '_timeout.bas' suffix.")
             sys.exit(1)
         
         if not self.pc1211_path.exists():
@@ -223,9 +243,22 @@ class TestHarness:
         expected_failures = []  # Should fail and did fail  
         unexpected_failures = [] # Should pass but failed
         unexpected_passes = []   # Should fail but passed
+        expected_timeouts = []  # Should timeout and did timeout
+        unexpected_timeouts = [] # Should not timeout but did timeout
         
         for r in self.results:
-            if r.expected_to_fail:
+            if r.is_timeout:
+                if r.expected_to_timeout:
+                    expected_timeouts.append(r)
+                else:
+                    unexpected_timeouts.append(r)
+            elif r.expected_to_timeout:
+                # Test was expected to timeout but didn't
+                if r.is_success():
+                    unexpected_passes.append(r)  # Didn't timeout when it should have
+                else:
+                    unexpected_failures.append(r)  # Failed for other reasons
+            elif r.expected_to_fail:
                 if r.is_success():
                     expected_failures.append(r)
                 else:
@@ -242,9 +275,17 @@ class TestHarness:
         print(f"Total tests:             {total_tests}")
         print(f"Expected passes:         {len(expected_passes)}")
         print(f"Expected failures:       {len(expected_failures)}")
+        print(f"Expected timeouts:       {len(expected_timeouts)}")
         print(f"Unexpected failures:     {len(unexpected_failures)}")
         print(f"Unexpected passes:       {len(unexpected_passes)}")
+        print(f"Unexpected timeouts:     {len(unexpected_timeouts)}")
         print()
+        
+        if len(unexpected_timeouts) > 0:
+            print("UNEXPECTED TIMEOUTS (tests that took too long):")
+            for r in unexpected_timeouts:
+                print(f"  - {r.name}")
+            print()
         
         if len(unexpected_failures) > 0:
             print("UNEXPECTED FAILURES (should have passed):")
@@ -344,6 +385,13 @@ def main():
     
     if args.compare:
         harness.compare_with_reference()
+    
+    # Exit with error code if there were any unexpected timeouts or unexpected failures
+    unexpected_timeouts = [r for r in harness.results if r.is_timeout and not r.expected_to_timeout]
+    unexpected_failures = [r for r in harness.results if not r.expected_to_fail and not r.expected_to_timeout and not r.is_success()]
+    
+    if unexpected_timeouts or unexpected_failures:
+        sys.exit(1)  # Exit with error code for unexpected timeouts or unexpected failures
 
 if __name__ == "__main__":
     main()
