@@ -819,7 +819,10 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
     }
 }
 
-/* Statement execution helper functions */
+/* Statement execution function pointer type */
+typedef void (*execute_fn_t)(void);
+
+/* Forward declarations for execution functions */
 static void execute_label(void);
 static void execute_var_assign(void);
 static void execute_svar_assign(void);
@@ -849,6 +852,44 @@ static void execute_rem(void);
 static void execute_colon(void);
 static void execute_eol(void);
 
+/* Function pointer table for statement execution - indexed by token value */
+static execute_fn_t execute_table[256] = {
+    [T_EOL] = execute_eol,
+    [T_STR] = execute_label,          /* Labels are stored as T_STR */
+    [T_VAR] = execute_var_assign,     /* Direct assignment: A = expr */
+    [T_SVAR] = execute_svar_assign,   /* String assignment: A$ = string_expr */
+    [T_VIDX] = execute_vidx_assign,   /* Indexed assignment: A(expr) = expr */
+    [T_SVIDX] = execute_svidx_assign, /* Indexed string assignment: A$(expr) = string_expr */
+
+    [T_COLON] = execute_colon,
+
+    [T_LET] = execute_let,
+    [T_PRINT] = execute_print,
+    [T_INPUT] = execute_input,
+    [T_IF] = execute_if,
+    [T_GOTO] = execute_goto,
+    [T_GOSUB] = execute_gosub,
+    [T_RETURN] = execute_return,
+    [T_FOR] = execute_for,
+    [T_NEXT] = execute_next,
+    [T_END] = execute_end,
+    [T_STOP] = execute_stop,
+    [T_REM] = execute_rem,
+
+    /* Mode & device commands */
+    [T_DEGREE] = execute_degree,
+    [T_RADIAN] = execute_radian,
+    [T_GRAD] = execute_grad,
+    [T_CLEAR] = execute_clear,
+    [T_BEEP] = execute_beep,
+    [T_PAUSE] = execute_pause,
+    [T_AREAD] = execute_aread,
+    [T_USING] = execute_using,
+
+    /* Default handler for all other tokens */
+    /* Note: All uninitialized entries are NULL, which we'll handle as execute_default */
+};
+
 /* Execute a single statement */
 void vm_execute_statement(void)
 {
@@ -858,127 +899,25 @@ void vm_execute_statement(void)
     uint8_t token = *g_vm.pc;
     g_vm.pc++;
 
-    switch (token)
+    /* Look up function in table */
+    execute_fn_t execute_fn = execute_table[token];
+
+    if (execute_fn)
     {
-    case T_STR: /* Label - skip it */
-        execute_label();
-        break;
+        uint8_t *pc_after_advance = g_vm.pc; /* PC after the advance */
+        execute_fn();
 
-    case T_VAR: /* Direct assignment: A = expr */
-        execute_var_assign();
-        break;
-
-    case T_SVAR: /* String assignment: A$ = string_expr */
-        execute_svar_assign();
-        break;
-
-    case T_VIDX: /* Indexed assignment: A(expr) = expr */
-        execute_vidx_assign();
-        break;
-
-    case T_SVIDX: /* Indexed string assignment: A$(expr) = string_expr */
-        execute_svidx_assign();
-        break;
-
-    case T_LET:
-        execute_let();
-        break;
-
-    case T_PRINT:
-        execute_print();
-        break;
-
-    case T_GOTO:
-        execute_goto();
-        return; /* GOTO doesn't advance PC normally */
-
-    case T_IF:
-        execute_if();
-        break;
-
-    case T_GOSUB:
-        execute_gosub();
-        return; /* Don't advance PC normally */
-
-    case T_RETURN:
-        execute_return();
-        return; /* Don't advance PC normally */
-
-    case T_FOR:
-        execute_for();
-        break;
-
-    case T_NEXT:
-    {
-        uint8_t *pc_before = g_vm.pc;
-        execute_next();
-        if (g_vm.pc != pc_before) /* PC was changed, we jumped back to FOR */
-            return;               /* Don't advance PC normally */
-        break;                    /* Loop finished, continue normally */
+        /* If the function changed PC (GOTO, GOSUB, RETURN, NEXT jump, etc.)
+         * or stopped running (END, STOP), don't do normal PC advancement */
+        if (!g_vm.running || g_vm.pc != pc_after_advance)
+        {
+            return;
+        }
     }
-
-    case T_END:
-        execute_end();
-        return;
-
-    case T_STOP:
-        execute_stop();
-        return;
-
-    case T_REM:
-        execute_rem();
-        break;
-
-    case T_COLON:
-        execute_colon();
-        break;
-
-    case T_EOL:
-        execute_eol();
-        break;
-
-    case T_INPUT:
-        execute_input();
-        break;
-
-    case T_AREAD:
-        execute_aread();
-        break;
-
-    /* Mode statements */
-    case T_DEGREE:
-        execute_degree();
-        break;
-
-    case T_RADIAN:
-        execute_radian();
-        break;
-
-    case T_GRAD:
-        execute_grad();
-        break;
-
-    /* Memory management */
-    case T_CLEAR:
-        execute_clear();
-        break;
-
-    /* Device commands */
-    case T_BEEP:
-        execute_beep();
-        break;
-
-    case T_PAUSE:
-        execute_pause();
-        break;
-
-    case T_USING:
-        execute_using();
-        break;
-
-    default:
+    else
+    {
+        /* Handle unknown tokens */
         execute_default();
-        break;
     }
 }
 
@@ -2151,8 +2090,8 @@ static void execute_default(void)
 
 static void execute_rem(void)
 {
-    /* Skip to end of line */
-    while (*g_vm.pc != T_EOL)
+    /* Skip remaining tokens on line until EOL */
+    while (*g_vm.pc != T_EOL && *g_vm.pc != 0)
     {
         g_vm.pc++;
     }
@@ -2182,20 +2121,20 @@ static void execute_eol(void)
 static void execute_if(void)
 {
     /* IF condition [THEN line_number | statement] */
-    
+
     /* First, evaluate the condition - same for both forms */
     uint8_t *line_end = program_find_line_end_from_pos(g_vm.pc);
-    
+
     bool condition = vm_eval_condition(&g_vm.pc, line_end);
     if (error_get_code() != ERR_NONE)
         return;
-    
+
     /* Now check what follows the condition */
     if (*g_vm.pc == T_THEN)
     {
         /* IF condition THEN target */
         g_vm.pc++; /* Skip T_THEN */
-        
+
         if (condition)
         {
             /* Evaluate the target after THEN (could be variable, number, or string label) */
@@ -2205,21 +2144,21 @@ static void execute_if(void)
                 char label_str[8]; /* 7 chars + null */
                 if (!eval_string_expression(&g_vm.pc, label_str))
                     return;
-                
+
                 uint16_t target_line = program_find_label(label_str);
                 if (target_line == 0)
                 {
                     error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
                     return;
                 }
-                
+
                 uint8_t *target = program_find_line_tokens(target_line);
                 if (!target)
                 {
                     error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
                     return;
                 }
-                
+
                 g_vm.pc = target;
                 g_vm.current_line = target_line;
             }
@@ -2229,26 +2168,24 @@ static void execute_if(void)
                 double line_num = vm_eval_expression_auto(&g_vm.pc);
                 if (error_get_code() != ERR_NONE)
                     return;
-                
+
                 uint8_t *target = program_find_line_tokens((int)line_num);
                 if (!target)
                 {
                     error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
                     return;
                 }
-                
+
                 g_vm.pc = target;
                 g_vm.current_line = (int)line_num;
             }
         }
         else
         {
-            /* Condition false - skip to end of line */
+            /* Condition false - advance to end of line */
             while (*g_vm.pc != T_EOL && *g_vm.pc != 0)
             {
-                g_vm.pc = token_skip(g_vm.pc);
-                if (!g_vm.pc)
-                    break;
+                g_vm.pc++;
             }
         }
     }
@@ -2262,12 +2199,10 @@ static void execute_if(void)
         }
         else
         {
-            /* Condition false - skip to end of line */
+            /* Condition false - advance to end of line */
             while (*g_vm.pc != T_EOL && *g_vm.pc != 0)
             {
-                g_vm.pc = token_skip(g_vm.pc);
-                if (!g_vm.pc)
-                    break;
+                g_vm.pc++;
             }
         }
     }
