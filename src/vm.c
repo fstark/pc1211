@@ -2182,41 +2182,27 @@ static void execute_eol(void)
 static void execute_if(void)
 {
     /* IF condition [THEN line_number | statement] */
-
-    /* Look for THEN token to determine IF type */
-    uint8_t *then_pos = g_vm.pc;
-    bool has_then = false;
-    while (*then_pos != T_THEN && *then_pos != T_EOL)
+    
+    /* First, evaluate the condition - same for both forms */
+    uint8_t *line_end = program_find_line_end_from_pos(g_vm.pc);
+    
+    bool condition = vm_eval_condition(&g_vm.pc, line_end);
+    if (error_get_code() != ERR_NONE)
+        return;
+    
+    /* Now check what follows the condition */
+    if (*g_vm.pc == T_THEN)
     {
-        then_pos = token_skip(then_pos);
-        if (!then_pos)
-            break;
-    }
-
-    if (*then_pos == T_THEN)
-    {
-        has_then = true;
-    }
-
-    if (has_then)
-    {
-        /* IF condition THEN line_number */
-        bool condition = vm_eval_condition(&g_vm.pc, then_pos);
-        if (error_get_code() != ERR_NONE)
-            return;
-
-        /* Skip to THEN */
-        g_vm.pc = then_pos + 1;
-
+        /* IF condition THEN target */
+        g_vm.pc++; /* Skip T_THEN */
+        
         if (condition)
         {
-            /* Evaluate the expression after THEN (could be variable, number, or string label) */
-            
-            /* Check if it's a string expression (for labels) */
+            /* Evaluate the target after THEN (could be variable, number, or string label) */
             if (*g_vm.pc == T_STR || *g_vm.pc == T_SVAR || *g_vm.pc == T_SVIDX)
             {
                 /* String label - evaluate and look up */
-                char label_str[8];  /* 7 chars + null */
+                char label_str[8]; /* 7 chars + null */
                 if (!eval_string_expression(&g_vm.pc, label_str))
                     return;
                 
@@ -2250,11 +2236,10 @@ static void execute_if(void)
                     error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
                     return;
                 }
-
+                
                 g_vm.pc = target;
                 g_vm.current_line = (int)line_num;
             }
-            /* Don't advance PC normally - handled by return */
         }
         else
         {
@@ -2270,105 +2255,10 @@ static void execute_if(void)
     else
     {
         /* IF condition statement (no THEN) */
-        /* Find where the statement begins by scanning for tokens after the condition */
-
-        uint8_t *saved_pc = g_vm.pc;
-        uint8_t *statement_pos = g_vm.pc;
-
-        /* Skip through the condition to find the statement */
-        /* A condition has the form: expr op expr */
-        /* We need to skip: expr, comparison operator, expr */
-
-        /* Skip first expression */
-        if (*statement_pos == T_STR)
-        {
-            /* String literal: T_STR <len> <data> */
-            statement_pos++; /* Skip T_STR */
-            uint8_t str_len = *statement_pos++;
-            statement_pos += str_len; /* Skip string data */
-        }
-        else if (*statement_pos == T_SVAR)
-        {
-            /* String variable: T_SVAR <index> */
-            statement_pos += 2;
-        }
-        else if (*statement_pos == T_SVIDX)
-        {
-            /* String indexed variable: T_SVIDX <expr> T_ENDX */
-            statement_pos++; /* Skip T_SVIDX */
-            /* Skip expression until T_ENDX */
-            while (*statement_pos != T_ENDX && *statement_pos != T_EOL)
-            {
-                statement_pos = token_skip(statement_pos);
-                if (!statement_pos)
-                    break;
-            }
-            if (*statement_pos == T_ENDX)
-                statement_pos++; /* Skip T_ENDX */
-        }
-        else
-        {
-            /* Numeric expression - use existing logic */
-            vm_eval_expression_auto(&statement_pos);
-            if (error_get_code() != ERR_NONE)
-                return;
-        }
-
-        /* Skip comparison operator */
-        if (*statement_pos == T_EQ || *statement_pos == T_EQ_ASSIGN || *statement_pos == T_NE ||
-            *statement_pos == T_LT || *statement_pos == T_LE ||
-            *statement_pos == T_GT || *statement_pos == T_GE)
-        {
-            statement_pos++;
-        }
-
-        /* Skip second expression */
-        if (*statement_pos == T_STR)
-        {
-            /* String literal: T_STR <len> <data> */
-            statement_pos++; /* Skip T_STR */
-            uint8_t str_len = *statement_pos++;
-            statement_pos += str_len; /* Skip string data */
-        }
-        else if (*statement_pos == T_SVAR)
-        {
-            /* String variable: T_SVAR <index> */
-            statement_pos += 2;
-        }
-        else if (*statement_pos == T_SVIDX)
-        {
-            /* String indexed variable: T_SVIDX <expr> T_ENDX */
-            statement_pos++; /* Skip T_SVIDX */
-            /* Skip expression until T_ENDX */
-            while (*statement_pos != T_ENDX && *statement_pos != T_EOL)
-            {
-                statement_pos = token_skip(statement_pos);
-                if (!statement_pos)
-                    break;
-            }
-            if (*statement_pos == T_ENDX)
-                statement_pos++; /* Skip T_ENDX */
-        }
-        else
-        {
-            /* Numeric expression */
-            vm_eval_expression_auto(&statement_pos);
-            if (error_get_code() != ERR_NONE)
-                return;
-        }
-
-        /* Reset PC and evaluate condition properly */
-        g_vm.pc = saved_pc;
-        error_clear(); /* Clear any errors from the parsing above */
-
-        bool condition = vm_eval_condition(&g_vm.pc, statement_pos);
-        if (error_get_code() != ERR_NONE)
-            return;
-
         if (condition)
         {
-            /* Execute the statement - PC should be at statement token */
-            /* Statement will be executed in next iteration */
+            /* Execute the statement - PC is already positioned at the statement */
+            /* Statement will be executed in next iteration of main loop */
         }
         else
         {
