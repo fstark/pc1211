@@ -272,8 +272,24 @@ uint8_t *token_skip(uint8_t *token)
     }
 
     case T_VAR:
+    case T_SVAR:
     case T_THEN:              /* THEN followed by u16 line number */
         return token + 1 + 1; /* opcode + 1 byte data */
+
+    case T_VIDX:
+    case T_SVIDX:
+        /* Variable with index: T_VIDX/T_SVIDX <expression> T_ENDX */
+        {
+            uint8_t *pos = token + 1; /* Skip the opcode */
+            /* Skip through the expression until we find T_ENDX */
+            while (pos && *pos != T_ENDX && *pos != T_EOL && *pos != 0)
+            {
+                pos = token_skip(pos);
+            }
+            if (pos && *pos == T_ENDX)
+                pos++; /* Skip the T_ENDX terminator */
+            return pos;
+        }
 
     case T_GOTO:
     case T_GOSUB:

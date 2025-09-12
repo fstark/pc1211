@@ -2210,25 +2210,50 @@ static void execute_if(void)
 
         if (condition)
         {
-            /* Must be followed by line number */
-            if (*g_vm.pc != T_NUM)
+            /* Evaluate the expression after THEN (could be variable, number, or string label) */
+            
+            /* Check if it's a string expression (for labels) */
+            if (*g_vm.pc == T_STR || *g_vm.pc == T_SVAR || *g_vm.pc == T_SVIDX)
             {
-                error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-                return;
+                /* String label - evaluate and look up */
+                char label_str[8];  /* 7 chars + null */
+                if (!eval_string_expression(&g_vm.pc, label_str))
+                    return;
+                
+                uint16_t target_line = program_find_label(label_str);
+                if (target_line == 0)
+                {
+                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                    return;
+                }
+                
+                uint8_t *target = program_find_line_tokens(target_line);
+                if (!target)
+                {
+                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                    return;
+                }
+                
+                g_vm.pc = target;
+                g_vm.current_line = target_line;
             }
-            g_vm.pc++;
-            double line_num = *(double *)g_vm.pc;
-            g_vm.pc += sizeof(double);
-
-            uint8_t *target = program_find_line_tokens((int)line_num);
-            if (!target)
+            else
             {
-                error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-                return;
-            }
+                /* Numeric expression - evaluate and use as line number */
+                double line_num = vm_eval_expression_auto(&g_vm.pc);
+                if (error_get_code() != ERR_NONE)
+                    return;
+                
+                uint8_t *target = program_find_line_tokens((int)line_num);
+                if (!target)
+                {
+                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+                    return;
+                }
 
-            g_vm.pc = target;
-            g_vm.current_line = (int)line_num;
+                g_vm.pc = target;
+                g_vm.current_line = (int)line_num;
+            }
             /* Don't advance PC normally - handled by return */
         }
         else
