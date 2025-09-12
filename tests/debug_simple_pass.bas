@@ -3,7 +3,7 @@
 30 Z=140
 40 PRINT "Z="; Z
 50 GOTO Z+100
-60 PRINT "Should not reach line 60"
+60 PRINT "FAIL: Should not reach line 60"
 240 PRINT "Reached line 240"
-250 PRINT "Reached line 250"
+250 PRINT "SUCCESS: Reached line 250"
 260 END

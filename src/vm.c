@@ -6,18 +6,14 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
-#ifdef _WIN32
-#include <windows.h>
-#else
+#include <assert.h>
 #include <unistd.h>
-#endif
 
 /* Global VM state */
 VM g_vm;
-AngleMode g_angle_mode = ANGLE_RADIAN; /* Default to radians */
-char g_aread_string[8] = "";           /* AREAD string value */
-double g_aread_value = 0.0;            /* AREAD numeric value */
-bool g_aread_is_string = false;        /* Whether AREAD value is a string */
+char g_aread_string[8] = "";    /* AREAD string value */
+double g_aread_value = 0.0;     /* AREAD numeric value */
+bool g_aread_is_string = false; /* Whether AREAD value is a string */
 
 /* Initialize VM */
 void vm_init(void)
@@ -25,6 +21,7 @@ void vm_init(void)
     g_vm.pc = NULL;
     g_vm.current_line = 0;
     g_vm.running = false;
+    g_vm.angle_mode = ANGLE_RADIAN; /* Default to radians */
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
@@ -44,11 +41,7 @@ void vm_push_value(double value)
 /* Pop value from expression stack */
 double vm_pop_value(void)
 {
-    if (g_vm.expr_stack.top <= 0)
-    {
-        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
-        return 0.0;
-    }
+    assert(g_vm.expr_stack.top > 0); /* Stack underflow is a programming error */
     return g_vm.expr_stack.values[--g_vm.expr_stack.top];
 }
 
@@ -128,7 +121,7 @@ bool vm_find_for_by_var(uint8_t var_idx, int *frame_index)
 /* Angle conversion functions for trigonometric operations */
 double convert_angle_to_radians(double angle)
 {
-    switch (g_angle_mode)
+    switch (g_vm.angle_mode)
     {
     case ANGLE_DEGREE:
         return angle * (M_PI / 180.0);
@@ -142,7 +135,7 @@ double convert_angle_to_radians(double angle)
 
 double convert_angle_from_radians(double radians)
 {
-    switch (g_angle_mode)
+    switch (g_vm.angle_mode)
     {
     case ANGLE_DEGREE:
         return radians * (180.0 / M_PI);
@@ -154,62 +147,64 @@ double convert_angle_from_radians(double radians)
     }
 }
 
-/* Forward declarations for expression parsing */
-static double parse_expression(uint8_t **pc_ptr, uint8_t *end);
-static double parse_term(uint8_t **pc_ptr, uint8_t *end);
-static double parse_power(uint8_t **pc_ptr, uint8_t *end);
-static double parse_factor(uint8_t **pc_ptr, uint8_t *end);
+/* Token-aware expression evaluation */
+static double eval_expression_auto(uint8_t **pc_ptr);
+static double eval_term_auto(uint8_t **pc_ptr);
+static double eval_power_auto(uint8_t **pc_ptr);
+static double eval_factor_auto(uint8_t **pc_ptr);
 
-/* Evaluate expression using recursive descent parser */
-double vm_eval_expression(uint8_t **pc_ptr, uint8_t *end)
+/* Token-aware expression evaluation (no boundaries needed) */
+double vm_eval_expression_auto(uint8_t **pc_ptr)
 {
-    return parse_expression(pc_ptr, end);
+    return eval_expression_auto(pc_ptr);
 }
 
-/* Parse expression: term ((+|-) term)* */
-static double parse_expression(uint8_t **pc_ptr, uint8_t *end)
-{
-    double result = parse_term(pc_ptr, end);
+/* Token-aware expression evaluation (no explicit boundaries needed) */
 
-    while (*pc_ptr < end)
+/* Evaluate expression: term ((+|-) term)* */
+static double eval_expression_auto(uint8_t **pc_ptr)
+{
+    double result = eval_term_auto(pc_ptr);
+
+    while (true)
     {
         uint8_t op = **pc_ptr;
         if (op == T_PLUS)
         {
             (*pc_ptr)++;
-            result += parse_term(pc_ptr, end);
+            result += eval_term_auto(pc_ptr);
         }
         else if (op == T_MINUS)
         {
             (*pc_ptr)++;
-            result -= parse_term(pc_ptr, end);
+            result -= eval_term_auto(pc_ptr);
         }
         else
         {
-            break;
+            break; /* Stop at any other token */
         }
     }
 
     return result;
 }
 
-/* Parse term: power ((*|/) power)* */
-static double parse_term(uint8_t **pc_ptr, uint8_t *end)
+/* Evaluate term: power ((*|/) power)* */
+static double eval_term_auto(uint8_t **pc_ptr)
 {
-    double result = parse_power(pc_ptr, end);
+    double result = eval_power_auto(pc_ptr);
 
-    while (*pc_ptr < end)
+    while (true)
     {
         uint8_t op = **pc_ptr;
         if (op == T_MUL)
         {
             (*pc_ptr)++;
-            result *= parse_power(pc_ptr, end);
+            result *= eval_power_auto(pc_ptr);
         }
         else if (op == T_DIV)
         {
             (*pc_ptr)++;
-            double divisor = parse_power(pc_ptr, end);
+            double divisor = eval_power_auto(pc_ptr);
             if (divisor == 0.0)
             {
                 error_set(ERR_DIVISION_BY_ZERO, g_vm.current_line);
@@ -219,22 +214,22 @@ static double parse_term(uint8_t **pc_ptr, uint8_t *end)
         }
         else
         {
-            break;
+            break; /* Stop at any other token */
         }
     }
 
     return result;
 }
 
-/* Parse power: factor (^ factor)* (right associative) */
-static double parse_power(uint8_t **pc_ptr, uint8_t *end)
+/* Evaluate power: factor (^ factor)* (right associative) */
+static double eval_power_auto(uint8_t **pc_ptr)
 {
-    double result = parse_factor(pc_ptr, end);
+    double result = eval_factor_auto(pc_ptr);
 
-    if (*pc_ptr < end && **pc_ptr == T_POW)
+    if (**pc_ptr == T_POW)
     {
         (*pc_ptr)++;
-        double exponent = parse_power(pc_ptr, end); /* Right associative */
+        double exponent = eval_power_auto(pc_ptr); /* Right associative */
         result = pow(result, exponent);
 
         /* Check for math domain/overflow errors */
@@ -248,15 +243,9 @@ static double parse_power(uint8_t **pc_ptr, uint8_t *end)
     return result;
 }
 
-/* Parse factor: number | variable | variable(expr) | (expr) | -factor */
-static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
+/* Evaluate factor: number | variable | variable(expr) | (expr) | -factor */
+static double eval_factor_auto(uint8_t **pc_ptr)
 {
-    if (*pc_ptr >= end)
-    {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-        return 0.0;
-    }
-
     uint8_t token = **pc_ptr;
 
     switch (token)
@@ -293,10 +282,10 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
         (*pc_ptr)++; /* Skip T_VIDX */
 
         /* Evaluate index expression directly */
-        double index_val = vm_eval_expression(pc_ptr, end);
+        double index_val = eval_expression_auto(pc_ptr);
 
         /* Skip T_ENDX terminator */
-        if (*pc_ptr < end && **pc_ptr == T_ENDX)
+        if (**pc_ptr == T_ENDX)
         {
             (*pc_ptr)++;
         }
@@ -321,8 +310,8 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
     case T_LP:
     {
         (*pc_ptr)++;
-        double result = parse_expression(pc_ptr, end);
-        if (*pc_ptr < end && **pc_ptr == T_RP)
+        double result = eval_expression_auto(pc_ptr);
+        if (**pc_ptr == T_RP)
         {
             (*pc_ptr)++;
         }
@@ -336,7 +325,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
     case T_MINUS:
     {
         (*pc_ptr)++;
-        return -parse_factor(pc_ptr, end);
+        return -eval_factor_auto(pc_ptr);
     }
 
     /* Math functions */
@@ -349,7 +338,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double radians = convert_angle_to_radians(arg);
@@ -365,7 +354,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double radians = convert_angle_to_radians(arg);
@@ -381,7 +370,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double radians = convert_angle_to_radians(arg);
@@ -397,7 +386,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg < -1.0 || arg > 1.0)
@@ -418,7 +407,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg < -1.0 || arg > 1.0)
@@ -439,7 +428,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double radians = atan(arg);
@@ -455,7 +444,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg <= 0.0)
@@ -475,7 +464,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg <= 0.0)
@@ -495,7 +484,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double result = exp(arg);
@@ -516,7 +505,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg < 0.0)
@@ -536,7 +525,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         return fabs(arg);
@@ -551,7 +540,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         return floor(arg);
@@ -566,7 +555,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         if (arg < 0.0)
@@ -586,7 +575,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
 
@@ -613,7 +602,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
             return 0.0;
         }
         (*pc_ptr)++;
-        double arg = parse_expression(pc_ptr, end);
+        double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
 
@@ -646,7 +635,7 @@ static double parse_factor(uint8_t **pc_ptr, uint8_t *end)
 bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
 {
     /* Parse left side of comparison */
-    double left_val = vm_eval_expression(pc_ptr, end);
+    double left_val = vm_eval_expression_auto(pc_ptr);
 
     if (error_get_code() != ERR_NONE)
         return false;
@@ -662,7 +651,7 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
     (*pc_ptr)++;
 
     /* Parse right side of comparison */
-    double right_val = vm_eval_expression(pc_ptr, end);
+    double right_val = vm_eval_expression_auto(pc_ptr);
 
     if (error_get_code() != ERR_NONE)
         return false;
@@ -705,10 +694,6 @@ static void execute_for(void);
 static void execute_next(void);
 static void execute_end(void);
 static void execute_stop(void);
-static void execute_gosub(void);
-static void execute_return(void);
-static void execute_for(void);
-static void execute_next(void);
 static void execute_input(void);
 static void execute_aread(void);
 static void execute_degree(void);
@@ -880,8 +865,7 @@ static void execute_var_assign(void)
     g_vm.pc++;
 
     /* Evaluate right-hand side */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
-    double value = vm_eval_expression(&g_vm.pc, line_end);
+    double value = vm_eval_expression_auto(&g_vm.pc);
 
     if (error_get_code() != ERR_NONE)
         return;
@@ -959,8 +943,7 @@ static void execute_vidx_assign(void)
     /* No placeholder byte - directly parse the index expression */
 
     /* Evaluate index */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
-    double index_val = vm_eval_expression(&g_vm.pc, line_end);
+    double index_val = vm_eval_expression_auto(&g_vm.pc);
 
     /* Skip T_ENDX */
     if (*g_vm.pc == T_ENDX)
@@ -975,7 +958,7 @@ static void execute_vidx_assign(void)
     g_vm.pc++;
 
     /* Evaluate right-hand side */
-    double value = vm_eval_expression(&g_vm.pc, line_end);
+    double value = vm_eval_expression_auto(&g_vm.pc);
 
     if (error_get_code() != ERR_NONE)
         return;
@@ -997,8 +980,7 @@ static void execute_svidx_assign(void)
 {
     /* Indexed string assignment: A$(expr) = string_expr */
     /* T_SVIDX works like T_VIDX - parse expression between T_SVIDX and T_ENDX */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
-    double index_val = vm_eval_expression(&g_vm.pc, line_end);
+    double index_val = vm_eval_expression_auto(&g_vm.pc);
 
     /* Skip T_ENDX terminator */
     if (*g_vm.pc == T_ENDX)
@@ -1073,8 +1055,7 @@ static void execute_let(void)
         g_vm.pc++;
 
         /* Evaluate right-hand side */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double value = vm_eval_expression(&g_vm.pc, line_end);
+        double value = vm_eval_expression_auto(&g_vm.pc);
 
         if (error_get_code() != ERR_NONE)
             return;
@@ -1096,8 +1077,7 @@ static void execute_let(void)
         g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+        double index_val = vm_eval_expression_auto(&g_vm.pc);
 
         /* Skip T_ENDX */
         if (*g_vm.pc == T_ENDX)
@@ -1112,7 +1092,7 @@ static void execute_let(void)
         g_vm.pc++;
 
         /* Evaluate right-hand side */
-        double value = vm_eval_expression(&g_vm.pc, line_end);
+        double value = vm_eval_expression_auto(&g_vm.pc);
 
         if (error_get_code() != ERR_NONE)
             return;
@@ -1134,9 +1114,8 @@ static void execute_let(void)
 static void execute_print(void)
 {
     /* Simple PRINT implementation */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
 
-    while (g_vm.pc < line_end && *g_vm.pc != T_COLON && *g_vm.pc != T_EOL)
+    while (*g_vm.pc != T_COLON && *g_vm.pc != T_EOL)
     {
         if (*g_vm.pc == T_COMMA || *g_vm.pc == T_SEMI)
         {
@@ -1180,12 +1159,12 @@ static void execute_print(void)
             g_vm.pc++; /* Skip T_SVIDX */
 
             /* Evaluate index expression */
-            double index_val = vm_eval_expression(&g_vm.pc, line_end);
+            double index_val = vm_eval_expression_auto(&g_vm.pc);
             if (error_get_code() != ERR_NONE)
                 return;
 
             /* Skip T_ENDX terminator */
-            if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+            if (*g_vm.pc == T_ENDX)
             {
                 g_vm.pc++;
             }
@@ -1211,7 +1190,7 @@ static void execute_print(void)
         else
         {
             /* Handle numeric expressions */
-            double value = vm_eval_expression(&g_vm.pc, line_end);
+            double value = vm_eval_expression_auto(&g_vm.pc);
             if (error_get_code() != ERR_NONE)
                 return;
             printf("%g", value);
@@ -1278,15 +1257,7 @@ static void execute_goto(void)
     else
     {
         /* Parse expression for line number */
-        uint8_t *line_end = g_vm.pc;
-        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0)
-        {
-            line_end = token_skip(line_end);
-            if (!line_end)
-                break;
-        }
-
-        double line_num = parse_expression(&g_vm.pc, line_end);
+        double line_num = eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
         target_line = (uint16_t)line_num;
@@ -1369,15 +1340,7 @@ static void execute_gosub(void)
     else
     {
         /* Parse expression for line number */
-        uint8_t *line_end = g_vm.pc;
-        while (*line_end != T_EOL && *line_end != T_COLON && *line_end != 0)
-        {
-            line_end = token_skip(line_end);
-            if (!line_end)
-                break;
-        }
-
-        double line_num = parse_expression(&g_vm.pc, line_end);
+        double line_num = eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
         target_line = (uint16_t)line_num;
@@ -1435,60 +1398,30 @@ static void execute_for(void)
     }
     g_vm.pc++;
 
-    /* Parse start expression */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
-    uint8_t *to_pos = g_vm.pc;
-
-    /* Find TO keyword */
-    while (to_pos < line_end && *to_pos != T_TO && *to_pos != T_EOL)
-    {
-        to_pos = token_skip(to_pos);
-        if (!to_pos)
-            break;
-    }
-
-    if (to_pos >= line_end || *to_pos != T_TO)
-    {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-        return;
-    }
-
     /* Evaluate start expression */
-    double start_val = vm_eval_expression(&g_vm.pc, to_pos);
+    double start_val = vm_eval_expression_auto(&g_vm.pc);
     if (error_get_code() != ERR_NONE)
         return;
 
     /* Skip TO */
-    g_vm.pc = to_pos + 1;
-
-    /* Find STEP keyword or end of statement */
-    uint8_t *step_pos = g_vm.pc;
-    while (step_pos < line_end && *step_pos != T_STEP &&
-           *step_pos != T_COLON && *step_pos != T_EOL)
+    if (*g_vm.pc != T_TO)
     {
-        step_pos = token_skip(step_pos);
-        if (!step_pos)
-            break;
+        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        return;
     }
+    g_vm.pc++;
 
     /* Evaluate limit expression */
-    double limit_val = vm_eval_expression(&g_vm.pc, step_pos);
+    double limit_val = vm_eval_expression_auto(&g_vm.pc);
     if (error_get_code() != ERR_NONE)
         return;
 
     /* Parse optional STEP */
     double step_val = 1.0; /* Default step */
-    if (step_pos < line_end && *step_pos == T_STEP)
+    if (*g_vm.pc == T_STEP)
     {
-        g_vm.pc = step_pos + 1; /* Skip STEP */
-        uint8_t *stmt_end = step_pos;
-        while (stmt_end < line_end && *stmt_end != T_COLON && *stmt_end != T_EOL)
-        {
-            stmt_end = token_skip(stmt_end);
-            if (!stmt_end)
-                break;
-        }
-        step_val = vm_eval_expression(&g_vm.pc, stmt_end);
+        g_vm.pc++; /* Skip STEP */
+        step_val = vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
     }
@@ -1514,7 +1447,7 @@ static void execute_for(void)
     uint8_t *pc_after_for;
 
     /* Check if there are more statements on the current line */
-    if (g_vm.pc < line_end && *g_vm.pc == T_COLON)
+    if (*g_vm.pc == T_COLON)
     {
         /* There's a colon, so pc_after_for points to statement after colon */
         pc_after_for = g_vm.pc + 1; /* Skip the colon */
@@ -1522,7 +1455,13 @@ static void execute_for(void)
     else
     {
         /* No more statements on current line, jump to next line */
-        pc_after_for = line_end;
+        pc_after_for = g_vm.pc;
+        while (*pc_after_for != T_EOL)
+        {
+            pc_after_for = token_skip(pc_after_for);
+            if (!pc_after_for)
+                break;
+        }
         if (*pc_after_for == T_EOL)
         {
             pc_after_for++; /* Skip T_EOL */
@@ -1723,13 +1662,12 @@ static void execute_input(void)
         g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+        double index_val = vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Skip T_ENDX terminator */
-        if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+        if (*g_vm.pc == T_ENDX)
         {
             g_vm.pc++;
         }
@@ -1761,13 +1699,12 @@ static void execute_input(void)
         g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+        double index_val = vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Skip T_ENDX terminator */
-        if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+        if (*g_vm.pc == T_ENDX)
         {
             g_vm.pc++;
         }
@@ -1892,13 +1829,12 @@ static void execute_aread(void)
         g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+        double index_val = vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Skip T_ENDX terminator */
-        if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+        if (*g_vm.pc == T_ENDX)
         {
             g_vm.pc++;
         }
@@ -1934,13 +1870,12 @@ static void execute_aread(void)
         g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
-        uint8_t *line_end = program_find_line_end(g_vm.pc);
-        double index_val = vm_eval_expression(&g_vm.pc, line_end);
+        double index_val = vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Skip T_ENDX terminator */
-        if (g_vm.pc < line_end && *g_vm.pc == T_ENDX)
+        if (*g_vm.pc == T_ENDX)
         {
             g_vm.pc++;
         }
@@ -1981,17 +1916,17 @@ static void execute_aread(void)
 
 static void execute_degree(void)
 {
-    g_angle_mode = ANGLE_DEGREE;
+    g_vm.angle_mode = ANGLE_DEGREE;
 }
 
 static void execute_radian(void)
 {
-    g_angle_mode = ANGLE_RADIAN;
+    g_vm.angle_mode = ANGLE_RADIAN;
 }
 
 static void execute_grad(void)
 {
-    g_angle_mode = ANGLE_GRAD;
+    g_vm.angle_mode = ANGLE_GRAD;
 }
 
 static void execute_clear(void)
@@ -2013,10 +1948,9 @@ static void execute_beep(void)
 static void execute_pause(void)
 {
     /* PAUSE works exactly like PRINT, then waits 100ms */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
 
     /* Print expressions just like PRINT statement */
-    while (g_vm.pc < line_end && *g_vm.pc != T_EOL && *g_vm.pc != T_COLON)
+    while (*g_vm.pc != T_EOL && *g_vm.pc != T_COLON)
     {
         if (*g_vm.pc == T_STR)
         {
@@ -2040,7 +1974,7 @@ static void execute_pause(void)
         else
         {
             /* Evaluate and print numeric expression */
-            double value = vm_eval_expression(&g_vm.pc, line_end);
+            double value = vm_eval_expression_auto(&g_vm.pc);
             if (error_get_code() != ERR_NONE)
                 return;
 
@@ -2055,12 +1989,9 @@ static void execute_pause(void)
     printf("\n"); /* Always end with newline like PRINT */
     fflush(stdout);
 
-/* Wait 100ms */
-#ifdef _WIN32
-    Sleep(100); /* Windows */
-#else
-    usleep(100000); /* Unix: 100,000 microseconds = 100ms */
-#endif
+    /* Wait 100ms */
+    usleep(100000); /* 100,000 microseconds = 100ms */
+
     /* PAUSE clears AREAD after displaying */
     g_aread_value = 0.0;
     g_aread_string[0] = '\0';
@@ -2080,7 +2011,7 @@ static void execute_default(void)
 static void execute_rem(void)
 {
     /* Skip to end of line */
-    while (g_vm.pc < program_find_line_end(g_vm.pc) && *g_vm.pc != T_EOL)
+    while (*g_vm.pc != T_EOL)
     {
         g_vm.pc++;
     }
@@ -2110,19 +2041,18 @@ static void execute_eol(void)
 static void execute_if(void)
 {
     /* IF condition [THEN line_number | statement] */
-    uint8_t *line_end = program_find_line_end(g_vm.pc);
 
     /* Look for THEN token to determine IF type */
     uint8_t *then_pos = g_vm.pc;
     bool has_then = false;
-    while (then_pos < line_end && *then_pos != T_THEN && *then_pos != T_EOL)
+    while (*then_pos != T_THEN && *then_pos != T_EOL)
     {
         then_pos = token_skip(then_pos);
         if (!then_pos)
             break;
     }
 
-    if (then_pos < line_end && *then_pos == T_THEN)
+    if (*then_pos == T_THEN)
     {
         has_then = true;
     }
@@ -2163,7 +2093,12 @@ static void execute_if(void)
         else
         {
             /* Condition false - skip to end of line */
-            g_vm.pc = line_end;
+            while (*g_vm.pc != T_EOL && *g_vm.pc != 0)
+            {
+                g_vm.pc = token_skip(g_vm.pc);
+                if (!g_vm.pc)
+                    break;
+            }
         }
     }
     else
@@ -2174,20 +2109,20 @@ static void execute_if(void)
         uint8_t *saved_pc = g_vm.pc;
 
         /* Parse first expression */
-        vm_eval_expression(&g_vm.pc, line_end);
+        vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Skip comparison operator */
-        if (g_vm.pc < line_end && (*g_vm.pc == T_EQ || *g_vm.pc == T_EQ_ASSIGN || *g_vm.pc == T_NE ||
-                                   *g_vm.pc == T_LT || *g_vm.pc == T_LE ||
-                                   *g_vm.pc == T_GT || *g_vm.pc == T_GE))
+        if (*g_vm.pc == T_EQ || *g_vm.pc == T_EQ_ASSIGN || *g_vm.pc == T_NE ||
+            *g_vm.pc == T_LT || *g_vm.pc == T_LE ||
+            *g_vm.pc == T_GT || *g_vm.pc == T_GE)
         {
             g_vm.pc++;
         }
 
         /* Parse second expression */
-        vm_eval_expression(&g_vm.pc, line_end);
+        vm_eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
 
@@ -2210,7 +2145,12 @@ static void execute_if(void)
         else
         {
             /* Condition false - skip to end of line */
-            g_vm.pc = line_end;
+            while (*g_vm.pc != T_EOL && *g_vm.pc != 0)
+            {
+                g_vm.pc = token_skip(g_vm.pc);
+                if (!g_vm.pc)
+                    break;
+            }
         }
     }
 }

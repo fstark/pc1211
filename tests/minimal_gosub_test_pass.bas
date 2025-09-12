@@ -1,7 +1,10 @@
 10 PRINT "Starting GOSUB test"
+15 A=1
 20 B=200
 30 GOSUB B
-40 PRINT "Back from GOSUB"
-50 END
+40 IF A=2 PRINT "SUCCESS: Back from GOSUB": END
+50 PRINT "FAIL: GOSUB did not set A=2"
+60 END
 200 PRINT "In subroutine"
+205 A=2
 210 RETURN

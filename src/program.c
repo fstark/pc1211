@@ -376,7 +376,29 @@ uint8_t *program_find_line_end(uint8_t *tokens)
             break;
     }
 
+    /* Assert that we found T_EOL - every line should end with it */
+    assert(pos < prog_end && *pos == T_EOL);
+
     return pos;
+}
+
+/* Find end of current line from any position within the line */
+uint8_t *program_find_line_end_from_pos(uint8_t *pos)
+{
+    if (!pos)
+        return NULL;
+
+    uint8_t *prog_end = g_program.prog + g_program.prog_len;
+
+    while (pos < prog_end && *pos != T_EOL)
+    {
+        pos = token_skip(pos);
+        if (!pos)
+            break;
+    }
+
+    /* We should have found T_EOL within the program bounds */
+    return pos; /* pos now points to T_EOL or prog_end */
 }
 
 /* Get first line tokens */

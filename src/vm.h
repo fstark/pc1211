@@ -42,12 +42,21 @@ typedef struct
     int top;
 } ForStack;
 
+/* Angle modes for trigonometric functions */
+typedef enum
+{
+    ANGLE_RADIAN = 0, /* Default mode */
+    ANGLE_DEGREE = 1,
+    ANGLE_GRAD = 2
+} AngleMode;
+
 /* VM state */
 typedef struct
 {
     uint8_t *pc;          /* Program counter (token pointer) */
     int current_line;     /* Current line number for error reporting */
     bool running;         /* VM running state */
+    AngleMode angle_mode; /* Trigonometric angle mode */
     ExprStack expr_stack; /* Expression evaluation stack */
     CallStack call_stack; /* GOSUB/RETURN call stack */
     ForStack for_stack;   /* FOR/NEXT loop stack */
@@ -60,7 +69,7 @@ void vm_step(void);
 void vm_halt(void);
 
 /* Expression evaluation */
-double vm_eval_expression(uint8_t **pc_ptr, uint8_t *end);
+double vm_eval_expression_auto(uint8_t **pc_ptr); /* Token-aware, no boundaries */
 void vm_push_value(double value);
 double vm_pop_value(void);
 
@@ -79,21 +88,12 @@ bool vm_find_for_by_var(uint8_t var_idx, int *frame_index);
 /* Statement execution */
 void vm_execute_statement(void);
 
-/* Angle modes for trigonometric functions */
-typedef enum
-{
-    ANGLE_RADIAN = 0, /* Default mode */
-    ANGLE_DEGREE = 1,
-    ANGLE_GRAD = 2
-} AngleMode;
-
 /* Angle conversion functions */
 double convert_angle_to_radians(double angle);
 double convert_angle_from_radians(double radians);
 
 /* Global VM state */
 extern VM g_vm;
-extern AngleMode g_angle_mode;
 extern char g_aread_string[8]; /* AREAD string value (up to 7 chars + null) */
 extern double g_aread_value;   /* AREAD numeric value */
 extern bool g_aread_is_string; /* Whether AREAD value is a string */
