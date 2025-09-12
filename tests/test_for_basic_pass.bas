@@ -1,5 +1,8 @@
+5 A = 0
 10 FOR I=1 TO 3
 20 PRINT I
+25 A = A + 1
 30 NEXT I
-40 PRINT "DONE"
-50 END
+40 IF A=3  PRINT "PASS: DONE": END
+50 PRINT "FAIL: A should be 3 but is "; A
+

@@ -3,4 +3,4 @@
 30 P. "Short print"
 40 G. 100
 50 E.
-100 PRINT "Target line"
+100 P. "PASS: Abbreviations worked"

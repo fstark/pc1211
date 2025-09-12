@@ -11,4 +11,4 @@
 110 RETURN
 200 PRINT "Numbered subroutine"
 210 RETURN
-220 "END" PRINT "All tests passed!"
+220 "END" PRINT "PASS: All tests passed!"

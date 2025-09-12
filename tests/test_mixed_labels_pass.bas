@@ -9,7 +9,7 @@
 90 GOSUB "SUB"
 100 PRINT "Back from labeled subroutine"
 110 GOSUB 140
-120 PRINT "Back from numbered subroutine"
+120 PRINT "PASS: Back from numbered subroutine"
 130 END
 140 PRINT "In numbered subroutine"
 150 RETURN

@@ -34,3 +34,4 @@
 340 PRINT "AREAD after PAUSE:", C, " (should be 0)"
 350 USING
 360 PRINT "Phase 7 implementation complete!"
+400 PRINT "PASS: PHASE 7 COMPLETE"

@@ -5,5 +5,5 @@
 50 GOTO Z+100
 60 PRINT "FAIL: Should not reach line 60"
 240 PRINT "Reached line 240"
-250 PRINT "SUCCESS: Reached line 250"
+250 PRINT "PASS: Reached line 250"
 260 END

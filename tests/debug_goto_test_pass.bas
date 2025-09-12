@@ -13,6 +13,5 @@
 170 END
 210 PRINT "GOSUB with expression worked!"
 220 RETURN
-240 PRINT "GOTO with complex expression worked!"
-250 PRINT "SUCCESS"
+240 PRINT "PASS: GOTO with complex expression worked!"
 260 END

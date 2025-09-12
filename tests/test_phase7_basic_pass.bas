@@ -21,3 +21,4 @@
 210 PAUSE "Waiting 100ms..."
 230 USING
 240 PRINT "Phase 7 complete!"
+250 PRINT "PASS: PHASE 7"

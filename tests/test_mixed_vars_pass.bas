@@ -7,4 +7,5 @@
 70 PRINT "String B$:", B$
 80 PRINT "Numeric C:", C
 90 PRINT "String D$:", D$
-100 END
+100 PRINT "PASS: NUM AND STRINGS"
+

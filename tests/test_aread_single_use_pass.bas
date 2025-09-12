@@ -3,4 +3,4 @@
 30 PRINT "First AREAD into A:", A
 40 AREAD B
 50 PRINT "Second AREAD into B (should be 0):", B  
-60 PRINT "Test complete"
+60 PRINT "PASS: Test complete"

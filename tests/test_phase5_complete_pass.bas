@@ -17,3 +17,4 @@
 170 PRINT "After A(5)=999, A$=",A$
 180 A$="NEWVAL"
 190 PRINT "After A$=NEWVAL, A(5) is now string type"
+200 PRINT "PASS: TEST EXECUTED"

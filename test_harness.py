@@ -36,13 +36,48 @@ class TestResult:
             raise ValueError(f"Test file {self.name} must end with either '_pass.bas' or '_fail.bas'")
     
     def is_success(self) -> bool:
-        """Test succeeded if exit code matches expectation"""
-        if self.expected_to_fail:
-            # For input tests or infinite loops, timeout (-1) is success
-            # For error tests, non-zero exit code is success
-            return self.exit_code != 0 or self.exit_code == -1
+        """Test succeeded if exit code matches expectation AND output format is correct"""
+        # First check for proper output format
+        output_lines = self.stdout.strip().split('\n')
+        has_pass_fail_marker = False
+        test_passed_by_output = False
+        fail_reason = None
+        
+        for line in output_lines:
+            if line.startswith('PASS:'):
+                has_pass_fail_marker = True
+                test_passed_by_output = True
+                break
+            elif line.startswith('FAIL:'):
+                has_pass_fail_marker = True
+                test_passed_by_output = False
+                fail_reason = line[5:].strip()  # Extract reason after "FAIL:"
+                break
+        
+        # Store the fail reason for reporting
+        if fail_reason:
+            self.fail_reason = fail_reason
         else:
-            return self.exit_code == 0   # Should pass
+            self.fail_reason = None
+        
+        # If exit code is not 0, test failed regardless of output
+        if self.exit_code != 0:
+            if not hasattr(self, 'fail_reason'):
+                self.fail_reason = f"Exit code {self.exit_code}"
+            return self.expected_to_fail  # Success if we expected it to fail
+        
+        # Exit code is 0, check output format
+        if not has_pass_fail_marker:
+            self.fail_reason = "Malformed test - no PASS: or FAIL: marker found"
+            return False  # Always fail malformed tests
+        
+        # Test has proper format, check if result matches expectation
+        if self.expected_to_fail:
+            # Expected to fail - success if output shows FAIL:
+            return not test_passed_by_output
+        else:
+            # Expected to pass - success if output shows PASS:
+            return test_passed_by_output
     
     def to_dict(self) -> Dict:
         return {
@@ -94,30 +129,44 @@ class TestHarness:
             
             status = "PASS" if test_result.is_success() else "FAIL"
             expected = "(expected)" if test_result.expected_to_fail else ""
-            print(f"{status} {expected} ({execution_time:.3f}s)")
+            
+            # Display the result
+            if test_result.is_success():
+                print(f"{status} {expected} ({execution_time:.3f}s)")
+            else:
+                # Test failed - show the reason
+                reason = getattr(test_result, 'fail_reason', 'Unknown failure')
+                print(f"{status} {expected} ({execution_time:.3f}s)")
+                if reason and not test_result.expected_to_fail:
+                    # Only show reason for unexpected failures
+                    print(f"    Reason: {reason}")
             
             return test_result
             
         except subprocess.TimeoutExpired:
             execution_time = time.time() - start_time
             print(f"TIMEOUT ({execution_time:.3f}s)")
-            return TestResult(
+            timeout_result = TestResult(
                 name=test_file.name,
                 exit_code=-1,
                 stdout="",
-                stderr="Test timed out after 10 seconds",
+                stderr="Test timed out after 0.5 seconds",
                 execution_time=execution_time
             )
+            timeout_result.fail_reason = "Test timed out"
+            return timeout_result
         except Exception as e:
             execution_time = time.time() - start_time
             print(f"ERROR: {e}")
-            return TestResult(
+            error_result = TestResult(
                 name=test_file.name,
                 exit_code=-2,
                 stdout="",
                 stderr=f"Test harness error: {e}",
                 execution_time=execution_time
             )
+            error_result.fail_reason = f"Test harness error: {e}"
+            return error_result
     
     def run_all_tests(self) -> None:
         """Run all tests and collect results"""

@@ -4,3 +4,4 @@
 40 PRINT "A$=",A$
 50 REM A should now be a string too
 60 PRINT "A as string=",A$
+70 PRINT "PASS: TYPE OVERWRITE"

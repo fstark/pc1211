@@ -7,5 +7,5 @@
 70 GOTO "END"
 80 "SUB1":PRINT "In subroutine 1"
 90 RETURN
-100 "END":PRINT "Program finished"
+100 "END":PRINT "PASS: Program finished"
 110 END

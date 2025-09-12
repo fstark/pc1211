@@ -631,50 +631,191 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     }
 }
 
-/* Evaluate condition for IF statement */
-bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
+/* Simple string evaluation for IF conditions - returns string in buffer, max 7 chars + null */
+static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
 {
-    /* Parse left side of comparison */
-    double left_val = vm_eval_expression_auto(pc_ptr);
+    uint8_t token = **pc_ptr;
 
-    if (error_get_code() != ERR_NONE)
-        return false;
-
-    /* Get comparison operator */
-    if (*pc_ptr >= end)
+    switch (token)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
-        return false;
+    case T_STR: /* String literal */
+    {
+        (*pc_ptr)++; /* Skip T_STR */
+        uint8_t str_len = **pc_ptr;
+        (*pc_ptr)++;
+
+        /* Copy up to 7 characters */
+        int copy_len = (str_len > 7) ? 7 : str_len;
+        memcpy(result_buffer, *pc_ptr, copy_len);
+        result_buffer[copy_len] = '\0';
+
+        *pc_ptr += str_len; /* Skip all string data */
+        return true;
     }
 
-    uint8_t op = **pc_ptr;
-    (*pc_ptr)++;
-
-    /* Parse right side of comparison */
-    double right_val = vm_eval_expression_auto(pc_ptr);
-
-    if (error_get_code() != ERR_NONE)
-        return false;
-
-    /* Perform comparison */
-    switch (op)
+    case T_SVAR: /* String variable A$-Z$ */
     {
-    case T_EQ:
-    case T_EQ_ASSIGN: /* Allow = as comparison in IF statements */
-        return left_val == right_val;
-    case T_NE:
-        return left_val != right_val;
-    case T_LT:
-        return left_val < right_val;
-    case T_LE:
-        return left_val <= right_val;
-    case T_GT:
-        return left_val > right_val;
-    case T_GE:
-        return left_val >= right_val;
+        (*pc_ptr)++; /* Skip T_SVAR */
+        uint8_t var_idx = **pc_ptr;
+        (*pc_ptr)++;
+
+        if (var_idx < 1 || var_idx > 26)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return false;
+        }
+
+        VarCell *cell = &g_program.vars[var_idx - 1];
+        if (cell->type != VAR_STR)
+        {
+            /* Uninitialized string variable = empty string */
+            result_buffer[0] = '\0';
+        }
+        else
+        {
+            strncpy(result_buffer, cell->value.str, 7);
+            result_buffer[7] = '\0';
+        }
+        return true;
+    }
+
+    case T_SVIDX: /* String variable with index A$(expr) */
+    {
+        (*pc_ptr)++; /* Skip T_SVIDX */
+
+        /* Evaluate index expression */
+        double index_val = vm_eval_expression_auto(pc_ptr);
+        if (error_get_code() != ERR_NONE)
+            return false;
+
+        /* Check for T_ENDX terminator */
+        if (**pc_ptr != T_ENDX)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
+        (*pc_ptr)++; /* Skip T_ENDX */
+
+        int index = (int)index_val;
+        if (index < 1 || index > VARS_MAX)
+        {
+            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            return false;
+        }
+
+        VarCell *cell = &g_program.vars[index - 1];
+        if (cell->type != VAR_STR)
+        {
+            result_buffer[0] = '\0'; /* Empty string */
+        }
+        else
+        {
+            strncpy(result_buffer, cell->value.str, 7);
+            result_buffer[7] = '\0';
+        }
+        return true;
+    }
+
     default:
         error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
         return false;
+    }
+}
+
+/* Evaluate condition for IF statement */
+bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
+{
+    /* Check if left side is a string expression */
+    uint8_t left_token = **pc_ptr;
+    bool is_string_comparison = (left_token == T_STR || left_token == T_SVAR || left_token == T_SVIDX);
+
+    if (is_string_comparison)
+    {
+        /* String comparison */
+        char left_str[8];  /* 7 chars + null */
+        char right_str[8]; /* 7 chars + null */
+
+        /* Evaluate left string */
+        if (!eval_string_expression(pc_ptr, left_str))
+            return false;
+
+        /* Get comparison operator - only = and <> supported for strings */
+        if (*pc_ptr >= end)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
+
+        uint8_t op = **pc_ptr;
+        if (op != T_EQ && op != T_EQ_ASSIGN && op != T_NE)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
+        (*pc_ptr)++;
+
+        /* Evaluate right string */
+        if (!eval_string_expression(pc_ptr, right_str))
+            return false;
+
+        /* Perform string comparison */
+        int cmp_result = strcmp(left_str, right_str);
+        switch (op)
+        {
+        case T_EQ:
+        case T_EQ_ASSIGN:
+            return cmp_result == 0;
+        case T_NE:
+            return cmp_result != 0;
+        default:
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
+    }
+    else
+    {
+        /* Numeric comparison */
+        double left_val = vm_eval_expression_auto(pc_ptr);
+
+        if (error_get_code() != ERR_NONE)
+            return false;
+
+        /* Get comparison operator */
+        if (*pc_ptr >= end)
+        {
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
+
+        uint8_t op = **pc_ptr;
+        (*pc_ptr)++;
+
+        /* Parse right side of comparison */
+        double right_val = vm_eval_expression_auto(pc_ptr);
+
+        if (error_get_code() != ERR_NONE)
+            return false;
+
+        /* Perform comparison */
+        switch (op)
+        {
+        case T_EQ:
+        case T_EQ_ASSIGN: /* Allow = as comparison in IF statements */
+            return left_val == right_val;
+        case T_NE:
+            return left_val != right_val;
+        case T_LT:
+            return left_val < right_val;
+        case T_LE:
+            return left_val <= right_val;
+        case T_GT:
+            return left_val > right_val;
+        case T_GE:
+            return left_val >= right_val;
+        default:
+            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            return false;
+        }
     }
 }
 
@@ -2104,30 +2245,92 @@ static void execute_if(void)
     else
     {
         /* IF condition statement (no THEN) */
-        /* Parse: IF expression comparison_op expression statement */
+        /* Find where the statement begins by scanning for tokens after the condition */
 
         uint8_t *saved_pc = g_vm.pc;
+        uint8_t *statement_pos = g_vm.pc;
 
-        /* Parse first expression */
-        vm_eval_expression_auto(&g_vm.pc);
-        if (error_get_code() != ERR_NONE)
-            return;
+        /* Skip through the condition to find the statement */
+        /* A condition has the form: expr op expr */
+        /* We need to skip: expr, comparison operator, expr */
 
-        /* Skip comparison operator */
-        if (*g_vm.pc == T_EQ || *g_vm.pc == T_EQ_ASSIGN || *g_vm.pc == T_NE ||
-            *g_vm.pc == T_LT || *g_vm.pc == T_LE ||
-            *g_vm.pc == T_GT || *g_vm.pc == T_GE)
+        /* Skip first expression */
+        if (*statement_pos == T_STR)
         {
-            g_vm.pc++;
+            /* String literal: T_STR <len> <data> */
+            statement_pos++; /* Skip T_STR */
+            uint8_t str_len = *statement_pos++;
+            statement_pos += str_len; /* Skip string data */
+        }
+        else if (*statement_pos == T_SVAR)
+        {
+            /* String variable: T_SVAR <index> */
+            statement_pos += 2;
+        }
+        else if (*statement_pos == T_SVIDX)
+        {
+            /* String indexed variable: T_SVIDX <expr> T_ENDX */
+            statement_pos++; /* Skip T_SVIDX */
+            /* Skip expression until T_ENDX */
+            while (*statement_pos != T_ENDX && *statement_pos != T_EOL)
+            {
+                statement_pos = token_skip(statement_pos);
+                if (!statement_pos)
+                    break;
+            }
+            if (*statement_pos == T_ENDX)
+                statement_pos++; /* Skip T_ENDX */
+        }
+        else
+        {
+            /* Numeric expression - use existing logic */
+            vm_eval_expression_auto(&statement_pos);
+            if (error_get_code() != ERR_NONE)
+                return;
         }
 
-        /* Parse second expression */
-        vm_eval_expression_auto(&g_vm.pc);
-        if (error_get_code() != ERR_NONE)
-            return;
+        /* Skip comparison operator */
+        if (*statement_pos == T_EQ || *statement_pos == T_EQ_ASSIGN || *statement_pos == T_NE ||
+            *statement_pos == T_LT || *statement_pos == T_LE ||
+            *statement_pos == T_GT || *statement_pos == T_GE)
+        {
+            statement_pos++;
+        }
 
-        /* Now g_vm.pc should be at the statement */
-        uint8_t *statement_pos = g_vm.pc;
+        /* Skip second expression */
+        if (*statement_pos == T_STR)
+        {
+            /* String literal: T_STR <len> <data> */
+            statement_pos++; /* Skip T_STR */
+            uint8_t str_len = *statement_pos++;
+            statement_pos += str_len; /* Skip string data */
+        }
+        else if (*statement_pos == T_SVAR)
+        {
+            /* String variable: T_SVAR <index> */
+            statement_pos += 2;
+        }
+        else if (*statement_pos == T_SVIDX)
+        {
+            /* String indexed variable: T_SVIDX <expr> T_ENDX */
+            statement_pos++; /* Skip T_SVIDX */
+            /* Skip expression until T_ENDX */
+            while (*statement_pos != T_ENDX && *statement_pos != T_EOL)
+            {
+                statement_pos = token_skip(statement_pos);
+                if (!statement_pos)
+                    break;
+            }
+            if (*statement_pos == T_ENDX)
+                statement_pos++; /* Skip T_ENDX */
+        }
+        else
+        {
+            /* Numeric expression */
+            vm_eval_expression_auto(&statement_pos);
+            if (error_get_code() != ERR_NONE)
+                return;
+        }
 
         /* Reset PC and evaluate condition properly */
         g_vm.pc = saved_pc;
