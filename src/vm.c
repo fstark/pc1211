@@ -22,7 +22,7 @@ void vm_init(void)
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
-    
+
     /* Initialize AREAD state */
     g_vm.aread_string[0] = '\0';
     g_vm.aread_value = 0.0;
@@ -91,18 +91,22 @@ static void vm_next_line(void)
 
 void vm_error_set(ErrorCode code)
 {
-    error_set(code, get_line(g_vm.current_line_ptr));
+    error_fatal(code, get_line(g_vm.current_line_ptr));
+}
+
+void vm_error_if(bool condition, ErrorCode code)
+{
+    if (condition)
+    {
+        vm_error_set(code);
+    }
 }
 
 /* Go to specific line number - scans to find line */
 static void vm_goto_line(uint16_t target_line)
 {
     uint8_t *line_ptr = program_find_line(target_line);
-    if (!line_ptr)
-    {
-        vm_error_set(ERR_BAD_LINE_NUMBER);
-        return;
-    }
+    vm_error_if(!line_ptr, ERR_BAD_LINE_NUMBER);
 
     VMPosition pos;
     pos.pc = get_tokens(line_ptr);
@@ -114,22 +118,14 @@ static void vm_goto_line(uint16_t target_line)
 static void vm_goto_label(const char *label)
 {
     uint8_t *line_ptr = program_find_line_label(label);
-    if (!line_ptr)
-    {
-        vm_error_set(ERR_LABEL_NOT_FOUND);
-        return;
-    }
+    vm_error_if(!line_ptr, ERR_LABEL_NOT_FOUND);
     vm_goto_line_ptr(line_ptr);
 }
 
 /* Push value onto expression stack */
 void vm_push_value(double value)
 {
-    if (g_vm.expr_stack.top >= EXPR_STACK_SIZE)
-    {
-        vm_error_set(ERR_STACK_OVERFLOW);
-        return;
-    }
+    vm_error_if(g_vm.expr_stack.top >= EXPR_STACK_SIZE, ERR_STACK_OVERFLOW);
     g_vm.expr_stack.values[g_vm.expr_stack.top++] = value;
 }
 
@@ -143,11 +139,7 @@ double vm_pop_value(void)
 /* Push call frame onto call stack */
 void vm_push_call(VMPosition return_pos)
 {
-    if (g_vm.call_stack.top >= CALL_STACK_SIZE)
-    {
-        vm_error_set(ERR_STACK_OVERFLOW);
-        return;
-    }
+    vm_error_if(g_vm.call_stack.top >= CALL_STACK_SIZE, ERR_STACK_OVERFLOW);
     g_vm.call_stack.frames[g_vm.call_stack.top].return_pos = return_pos;
     g_vm.call_stack.top++;
 }
@@ -155,11 +147,7 @@ void vm_push_call(VMPosition return_pos)
 /* Pop call frame from call stack */
 bool vm_pop_call(VMPosition *return_pos)
 {
-    if (g_vm.call_stack.top <= 0)
-    {
-        vm_error_set(ERR_RETURN_WITHOUT_GOSUB);
-        return false;
-    }
+    vm_error_if(g_vm.call_stack.top <= 0, ERR_RETURN_WITHOUT_GOSUB);
     g_vm.call_stack.top--;
     *return_pos = g_vm.call_stack.frames[g_vm.call_stack.top].return_pos;
     return true;
@@ -168,11 +156,7 @@ bool vm_pop_call(VMPosition *return_pos)
 /* Push FOR frame onto FOR stack */
 void vm_push_for(VMPosition body, uint8_t var_idx, double limit, double step)
 {
-    if (g_vm.for_stack.top >= FOR_STACK_SIZE)
-    {
-        vm_error_set(ERR_STACK_OVERFLOW);
-        return;
-    }
+    vm_error_if(g_vm.for_stack.top >= FOR_STACK_SIZE, ERR_STACK_OVERFLOW);
     g_vm.for_stack.frames[g_vm.for_stack.top].body = body;
     g_vm.for_stack.frames[g_vm.for_stack.top].var_idx = var_idx;
     g_vm.for_stack.frames[g_vm.for_stack.top].limit = limit;
@@ -183,11 +167,7 @@ void vm_push_for(VMPosition body, uint8_t var_idx, double limit, double step)
 /* Pop FOR frame from FOR stack */
 bool vm_pop_for(VMPosition *body, uint8_t *var_idx, double *limit, double *step)
 {
-    if (g_vm.for_stack.top <= 0)
-    {
-        vm_error_set(ERR_NEXT_WITHOUT_FOR);
-        return false;
-    }
+    vm_error_if(g_vm.for_stack.top <= 0, ERR_NEXT_WITHOUT_FOR);
     g_vm.for_stack.top--;
     *body = g_vm.for_stack.frames[g_vm.for_stack.top].body;
     *var_idx = g_vm.for_stack.frames[g_vm.for_stack.top].var_idx;
@@ -298,11 +278,7 @@ static double eval_term_auto(uint8_t **pc_ptr)
         {
             (*pc_ptr)++;
             double divisor = eval_power_auto(pc_ptr);
-            if (divisor == 0.0)
-            {
-                vm_error_set(ERR_DIVISION_BY_ZERO);
-                return 0.0;
-            }
+            vm_error_if(divisor == 0.0, ERR_DIVISION_BY_ZERO);
             result /= divisor;
         }
         else
@@ -326,11 +302,7 @@ static double eval_power_auto(uint8_t **pc_ptr)
         result = pow(result, exponent);
 
         /* Check for math domain/overflow errors */
-        if (!isfinite(result))
-        {
-            vm_error_set(ERR_MATH_OVERFLOW);
-            return 0.0;
-        }
+        vm_error_if(!isfinite(result), ERR_MATH_OVERFLOW);
     }
 
     return result;
@@ -356,17 +328,9 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         uint8_t var_idx = **pc_ptr;
         (*pc_ptr)++;
-        if (var_idx < 1 || var_idx > 26)
-        { /* A-Z variables only */
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return 0.0;
-        }
+        vm_error_if(var_idx < 1 || var_idx > 26, ERR_INDEX_OUT_OF_RANGE);
         VarCell *cell = &g_program.vars[var_idx - 1];
-        if (cell->type != VAR_NUM)
-        {
-            vm_error_set(ERR_TYPE_MISMATCH);
-            return 0.0;
-        }
+        vm_error_if(cell->type != VAR_NUM, ERR_TYPE_MISMATCH);
         return cell->value.num;
     }
 
@@ -385,18 +349,10 @@ static double eval_factor_auto(uint8_t **pc_ptr)
 
         /* Convert to integer index (truncate toward zero) */
         int index = (int)index_val;
-        if (index < 1 || index > VARS_MAX)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return 0.0;
-        }
+        vm_error_if(index < 1 || index > VARS_MAX, ERR_INDEX_OUT_OF_RANGE);
 
         VarCell *cell = &g_program.vars[index - 1];
-        if (cell->type != VAR_NUM)
-        {
-            vm_error_set(ERR_TYPE_MISMATCH);
-            return 0.0;
-        }
+        vm_error_if(cell->type != VAR_NUM, ERR_TYPE_MISMATCH);
         return cell->value.num;
     }
 
@@ -408,10 +364,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         {
             (*pc_ptr)++;
         }
-        else
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-        }
+        vm_error_if(**pc_ptr != T_RP, ERR_SYNTAX_ERROR);
         return result;
     }
 
@@ -425,11 +378,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_SIN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -441,11 +390,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_COS:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -457,11 +402,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_TAN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -473,20 +414,12 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_ASN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        if (arg < -1.0 || arg > 1.0)
-        {
-            vm_error_set(ERR_MATH_DOMAIN);
-            return 0.0;
-        }
+        vm_error_if(arg < -1.0 || arg > 1.0, ERR_MATH_DOMAIN);
         double radians = asin(arg);
         return convert_angle_from_radians(radians);
     }
@@ -494,20 +427,12 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_ACS:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        if (arg < -1.0 || arg > 1.0)
-        {
-            vm_error_set(ERR_MATH_DOMAIN);
-            return 0.0;
-        }
+        vm_error_if(arg < -1.0 || arg > 1.0, ERR_MATH_DOMAIN);
         double radians = acos(arg);
         return convert_angle_from_radians(radians);
     }
@@ -515,11 +440,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_ATN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -531,92 +452,56 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_LOG:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        if (arg <= 0.0)
-        {
-            vm_error_set(ERR_MATH_DOMAIN);
-            return 0.0;
-        }
+        vm_error_if(arg <= 0.0, ERR_MATH_DOMAIN);
         return log10(arg);
     }
 
     case T_LN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        if (arg <= 0.0)
-        {
-            vm_error_set(ERR_MATH_DOMAIN);
-            return 0.0;
-        }
+        vm_error_if(arg <= 0.0, ERR_MATH_DOMAIN);
         return log(arg);
     }
 
     case T_EXP:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
         double result = exp(arg);
-        if (!isfinite(result))
-        {
-            vm_error_set(ERR_MATH_OVERFLOW);
-            return 0.0;
-        }
+        vm_error_if(!isfinite(result), ERR_MATH_OVERFLOW);
         return result;
     }
 
     case T_SQR:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
             (*pc_ptr)++;
-        if (arg < 0.0)
-        {
-            vm_error_set(ERR_MATH_DOMAIN);
-            return 0.0;
-        }
+        vm_error_if(arg < 0.0, ERR_MATH_DOMAIN);
         return sqrt(arg);
     }
 
     case T_ABS:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -627,11 +512,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_INT:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -642,11 +523,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_SGN:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -662,11 +539,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_DMS:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -689,11 +562,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_DEG:
     {
         (*pc_ptr)++;
-        if (**pc_ptr != T_LP)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return 0.0;
-        }
+    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -778,8 +647,6 @@ static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
 
         /* Evaluate index expression */
         double index_val = vm_eval_expression_auto(pc_ptr);
-        if (error_get_code() != ERR_NONE)
-            return false;
 
         /* Check for T_ENDX terminator */
         if (**pc_ptr != T_ENDX)
@@ -2158,6 +2025,9 @@ static void execute_if(void)
 /* Run program */
 void vm_run(void)
 {
+    /* Set up error context - any fatal errors will longjmp here */
+    ERROR_CONTEXT_SET(vm_error_handler);
+
     /* Clear any previous errors */
     error_clear();
 
@@ -2170,22 +2040,22 @@ void vm_run(void)
     }
 
     /* Main execution loop */
-    while (g_vm.running && error_get_code() == ERR_NONE && !program_is_last_line(g_vm.current_line_ptr))
+    while (g_vm.running && !program_is_last_line(g_vm.current_line_ptr))
     {
         vm_execute_statement();
     }
 
-    /* Handle any errors */
-    if (error_get_code() != ERR_NONE)
-    {
-        error_print();
-    }
+    return;
+
+vm_error_handler:
+    /* Error occurred during execution - print and return */
+    error_print();
 }
 
 /* Single step */
 void vm_step(void)
 {
-    if (g_vm.running && error_get_code() == ERR_NONE)
+    if (g_vm.running)
     {
         vm_execute_statement();
     }

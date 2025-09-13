@@ -19,7 +19,6 @@ Stylistic remarks
 * Use consistent indentation (4 spaces)
 * Favor < over > when comparing, unless comparing with a constant (ie: use ``if (a<b)``, but also `` if (a>0)``)
 
-
 Buffer and Memory Management
 * Always account for terminators in buffer lengths - Empty data structures still consume space for their termination markers
 * Terminators are real data, not conceptual - They have actual bytes in memory with defined structure
@@ -45,3 +44,6 @@ Debugging Support
 * Include debug breadcrumbs - Add sentinel values, debug prints, and validation that can be easily enabled
 * Make corruption visible - Structure code so buffer overruns and invalid states are immediately obvious
 * Use assertions liberally - Assert on all invariants, especially in low-level buffer manipulations
+
+
+After a successful change, ask me if I want you to commit. In such case, make clean, git status, git add, git commit with an appropriate message and git push

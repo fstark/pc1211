@@ -6,6 +6,9 @@
 ErrorCode g_last_error = ERR_NONE;
 int g_error_line = 0;
 
+/* Global jump buffer for error handling */
+jmp_buf g_error_jump_buf;
+
 /* Error messages */
 const char *error_message(ErrorCode code)
 {
@@ -65,6 +68,16 @@ void error_report(ErrorCode code, int line_number)
     fprintf(stderr, ": %s\n", error_message(code));
 
     exit(1);
+}
+
+/* Fatal error - never returns, uses longjmp */
+void error_fatal(ErrorCode code, int line_number)
+{
+    g_last_error = code;
+    g_error_line = line_number;
+
+    /* Jump back to error context */
+    longjmp(g_error_jump_buf, 1);
 }
 
 /* Set error without halting */

@@ -82,6 +82,10 @@ void vm_run(void);
 void vm_step(void);
 void vm_halt(void);
 
+/* Error handling */
+void vm_error_set(ErrorCode code);
+void vm_error_if(bool condition, ErrorCode code);
+
 /* Expression evaluation */
 double vm_eval_expression_auto(uint8_t **pc_ptr); /* Token-aware, no boundaries */
 void vm_push_value(double value);
