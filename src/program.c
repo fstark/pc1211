@@ -201,20 +201,55 @@ uint8_t *program_first_line(void)
     if (get_len(pos) == 0)
         return NULL;
 
+    assert(program_validate_line_ptr(pos));
     return pos;
+} /* Validate that a line pointer is within the program array */
+bool program_validate_line_ptr(uint8_t *line_ptr)
+{
+    if (!line_ptr)
+        return false;
+
+    /* Must be within program bounds */
+    if (line_ptr < g_program.prog || line_ptr >= g_program.prog + g_program.prog_len)
+        return false;
+
+    /* Must be at a valid line boundary (len field exists and is reasonable) */
+    if (line_ptr + sizeof(uint16_t) > g_program.prog + g_program.prog_len)
+        return false;
+
+    uint16_t len = get_len(line_ptr);
+    if (len == 0)
+        return true; /* End marker is valid */
+
+    /* Line must fit within program bounds */
+    if (line_ptr + len > g_program.prog + g_program.prog_len)
+        return false;
+
+    /* Minimum line size: len(2) + line_num(2) + T_EOL(1) = 5 bytes */
+    if (len < 5)
+        return false;
+
+    return true;
 }
 
-/* Get next line */
+/* Check if we're at the last line (for iteration) */
+bool program_is_last_line(uint8_t *line_ptr)
+{
+    assert(program_validate_line_ptr(line_ptr));
+    uint8_t *next_pos = line_ptr + get_len(line_ptr);
+    return get_len(next_pos) == 0;
+}
+
+/* Get next line - NEVER call at end of program! 
+ * This function NEVER returns NULL - it either succeeds or asserts.
+ * Use program_is_last_line() to check for end before calling. */
 uint8_t *program_next_line(uint8_t *current_line)
 {
-    if (!current_line)
-        return NULL;
+    assert(program_validate_line_ptr(current_line));
+    assert(!program_is_last_line(current_line)); /* Calling at end is a bug! */
 
     uint8_t *next_pos = current_line + get_len(current_line);
-    uint8_t *prog_end = g_program.prog + g_program.prog_len;
-
-    if (next_pos >= prog_end || get_len(next_pos) == 0)
-        return NULL;
+    assert(program_validate_line_ptr(next_pos)); /* Corruption check */
 
     return next_pos;
 }

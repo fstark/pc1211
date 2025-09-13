@@ -83,18 +83,17 @@ static void vm_next_line(void)
         return;
     }
 
-    g_vm.current_line_ptr = program_next_line(g_vm.current_line_ptr);
-    if (g_vm.current_line_ptr)
-    {
-        VMPosition pos;
-        pos.pc = get_tokens(g_vm.current_line_ptr);
-        pos.line = get_line(g_vm.current_line_ptr);
-        vm_restore_position(pos);
-    }
-    else
+    if (program_is_last_line(g_vm.current_line_ptr))
     {
         g_vm.running = false;
+        return;
     }
+
+    g_vm.current_line_ptr = program_next_line(g_vm.current_line_ptr);
+    VMPosition pos;
+    pos.pc = get_tokens(g_vm.current_line_ptr);
+    pos.line = get_line(g_vm.current_line_ptr);
+    vm_restore_position(pos);
 }
 
 /* Go to specific line number - scans to find line */

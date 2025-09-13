@@ -64,6 +64,8 @@ uint16_t program_find_label(const char *label);
 void program_clear_labels(void);
 uint8_t *program_find_line(uint16_t line_num);
 uint8_t *program_first_line(void);
+bool program_validate_line_ptr(uint8_t *line_ptr);
+bool program_is_last_line(uint8_t *line_ptr);
 uint8_t *program_next_line(uint8_t *current_line);
 
 /* Variable management */

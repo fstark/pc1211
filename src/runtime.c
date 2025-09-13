@@ -159,6 +159,8 @@ void cmd_list(void)
     while (line_ptr)
     {
         cmd_list_line(get_line(line_ptr));
+        if (program_is_last_line(line_ptr))
+            break;
         line_ptr = program_next_line(line_ptr);
     }
 }
@@ -475,6 +477,8 @@ void disassemble_program(void)
     while (line_ptr)
     {
         disassemble_line(line_ptr);
+        if (program_is_last_line(line_ptr))
+            break;
         line_ptr = program_next_line(line_ptr);
     }
 }
