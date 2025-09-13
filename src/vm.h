@@ -8,8 +8,8 @@
 /* VM position for capturing and restoring PC+line state */
 typedef struct
 {
-    uint8_t *pc;
-    int line;
+    uint8_t *line_ptr; //  Start of the line
+    uint8_t *pc;       //  PC
 } VMPosition;
 
 /* Expression evaluation stack */
@@ -61,13 +61,12 @@ typedef enum
 typedef struct
 {
     uint8_t *pc;               /* Program counter (token pointer) */
-    int current_line;          /* Current line number for error reporting */
+    uint8_t *current_line_ptr; /* Current line pointer */
     bool running;              /* VM running state */
     AngleMode angle_mode;      /* Trigonometric angle mode */
     ExprStack expr_stack;      /* Expression evaluation stack */
     CallStack call_stack;      /* GOSUB/RETURN call stack */
     ForStack for_stack;        /* FOR/NEXT loop stack */
-    uint8_t *current_line_ptr; /* Current line pointer for efficient navigation */
 } VM;
 
 /* VM initialization and control */

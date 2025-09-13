@@ -43,6 +43,8 @@ const char *error_message(ErrorCode code)
         return "Program too large";
     case ERR_STACK_OVERFLOW:
         return "Stack overflow";
+    case ERR_LABEL_NOT_FOUND:
+        return "Label not found";
 
     default:
         return "Unknown error";

@@ -32,11 +32,9 @@ typedef struct
 /* Program memory structure */
 typedef struct
 {
-    uint8_t prog[PROG_MAX_BYTES];  /* Token buffer */
-    int prog_len;                  /* Current program size */
-    VarCell vars[VARS_MAX + 1];    /* Variables 1..VARS_MAX (0 unused) */
-    LabelEntry labels[LABELS_MAX]; /* Label table */
-    int label_count;               /* Number of labels defined */
+    uint8_t prog[PROG_MAX_BYTES]; /* Token buffer */
+    int prog_len;                 /* Current program size */
+    VarCell vars[VARS_MAX + 1];   /* Variables 1..VARS_MAX (0 unused) */
 } Program;
 
 /* Line record format: u16 len | u16 line | tokens... | T_EOL */
@@ -60,11 +58,11 @@ bool program_delete_line(uint16_t line_num);
 
 /* Label management */
 void program_add_label(const char *label, uint16_t line_num);
-uint16_t program_find_label(const char *label);
-void program_clear_labels(void);
+uint8_t *program_find_line_label(const char *label);
 uint8_t *program_find_line(uint16_t line_num);
+uint8_t *program_find_first_line_after(uint16_t target_line);
 uint8_t *program_first_line(void);
-bool program_validate_line_ptr(uint8_t *line_ptr);
+void program_validate_line_ptr(uint8_t *line_ptr);
 bool program_is_last_line(uint8_t *line_ptr);
 uint8_t *program_next_line(uint8_t *current_line);
 
@@ -75,6 +73,7 @@ void var_set_num(int index, double value);
 void var_set_str(int index, const char *value);
 
 /* Token stream utilities */
+bool program_validate_token_ptr(uint8_t *token_ptr);
 uint8_t *token_skip(uint8_t *token);             /* Skip one token, return next */
 void token_dump(const uint8_t *tokens, int len); /* Debug dump */
 

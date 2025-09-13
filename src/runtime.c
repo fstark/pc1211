@@ -148,20 +148,9 @@ const char *token_name(Tok token)
 /* LIST command - display readable program listing */
 void cmd_list(void)
 {
-    uint8_t *line_ptr = program_first_line();
-
-    if (!line_ptr)
-    {
-        printf("No program loaded.\n");
-        return;
-    }
-
-    while (line_ptr)
+    for (uint8_t *line_ptr = program_first_line(); !program_is_last_line(line_ptr); line_ptr += get_len(line_ptr))
     {
         cmd_list_line(get_line(line_ptr));
-        if (program_is_last_line(line_ptr))
-            break;
-        line_ptr = program_next_line(line_ptr);
     }
 }
 
@@ -465,21 +454,10 @@ void cmd_list_line(uint16_t line_num)
 /* Disassemble program (debug dump) */
 void disassemble_program(void)
 {
-    uint8_t *line_ptr = program_first_line();
-
-    if (!line_ptr)
-    {
-        printf("No program loaded.\n");
-        return;
-    }
-
     printf("Program dump:\n");
-    while (line_ptr)
+    for (uint8_t *line_ptr = program_first_line(); get_len(line_ptr) != 0; line_ptr += get_len(line_ptr))
     {
         disassemble_line(line_ptr);
-        if (program_is_last_line(line_ptr))
-            break;
-        line_ptr = program_next_line(line_ptr);
     }
 }
 

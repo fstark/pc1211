@@ -19,13 +19,12 @@ bool g_aread_is_string = false; /* Whether AREAD value is a string */
 void vm_init(void)
 {
     g_vm.pc = NULL;
-    g_vm.current_line = 0;
+    g_vm.current_line_ptr = NULL;
     g_vm.running = false;
     g_vm.angle_mode = ANGLE_RADIAN; /* Default to radians */
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
-    g_vm.current_line_ptr = NULL;
 }
 
 /* Core position management functions */
@@ -35,53 +34,53 @@ static VMPosition vm_capture_position(void)
 {
     VMPosition pos;
     pos.pc = g_vm.pc;
-    pos.line = g_vm.current_line;
+    pos.line_ptr = g_vm.current_line_ptr;
     return pos;
 }
 
-/* Restore position from captured state - this is the ONLY function that changes PC+line */
 static void vm_restore_position(VMPosition pos)
 {
     g_vm.pc = pos.pc;
-    g_vm.current_line = pos.line;
-
-    /* Update current_line_ptr to match the line */
-    if (pos.line > 0)
-    {
-        g_vm.current_line_ptr = program_find_line(pos.line);
-    }
-    else
-    {
-        g_vm.current_line_ptr = NULL;
-    }
+    g_vm.current_line_ptr = pos.line_ptr;
 }
 
 /* Start program at first line */
 static void vm_start_program(void)
 {
+    // ####
     g_vm.current_line_ptr = program_first_line();
-    if (g_vm.current_line_ptr)
+
+    /* Check if program has any executable lines */
+    if (get_len(g_vm.current_line_ptr) == 0)
     {
-        VMPosition pos;
-        pos.pc = get_tokens(g_vm.current_line_ptr);
-        pos.line = get_line(g_vm.current_line_ptr);
-        vm_restore_position(pos);
-        g_vm.running = true;
+        /* Empty program - no lines to execute */
+        g_vm.running = false;
     }
     else
     {
-        g_vm.running = false;
+        /* Program has lines - start execution */
+        VMPosition pos;
+        pos.pc = get_tokens(g_vm.current_line_ptr);
+        pos.line_ptr = g_vm.current_line_ptr;
+        vm_restore_position(pos);
+        g_vm.running = true;
     }
+}
+
+void vm_goto_line_ptr(uint8_t *line_ptr)
+{
+    program_validate_line_ptr(line_ptr);
+
+    VMPosition pos;
+    pos.pc = get_tokens(line_ptr);
+    pos.line_ptr = line_ptr;
+    vm_restore_position(pos);
 }
 
 /* Advance to next line or end program */
 static void vm_next_line(void)
 {
-    if (!g_vm.current_line_ptr)
-    {
-        g_vm.running = false;
-        return;
-    }
+    assert(g_vm.current_line_ptr); /* VM state should be valid when calling this */
 
     if (program_is_last_line(g_vm.current_line_ptr))
     {
@@ -92,8 +91,13 @@ static void vm_next_line(void)
     g_vm.current_line_ptr = program_next_line(g_vm.current_line_ptr);
     VMPosition pos;
     pos.pc = get_tokens(g_vm.current_line_ptr);
-    pos.line = get_line(g_vm.current_line_ptr);
+    pos.line_ptr = g_vm.current_line_ptr;
     vm_restore_position(pos);
+}
+
+void vm_error_set(ErrorCode code)
+{
+    error_set(code, get_line(g_vm.current_line_ptr));
 }
 
 /* Go to specific line number - scans to find line */
@@ -102,26 +106,26 @@ static void vm_goto_line(uint16_t target_line)
     uint8_t *line_ptr = program_find_line(target_line);
     if (!line_ptr)
     {
-        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        vm_error_set(ERR_BAD_LINE_NUMBER);
         return;
     }
 
     VMPosition pos;
     pos.pc = get_tokens(line_ptr);
-    pos.line = get_line(line_ptr);
+    pos.line_ptr = line_ptr;
     vm_restore_position(pos);
 }
 
 /* Go to label - looks up label then goes to line */
 static void vm_goto_label(const char *label)
 {
-    uint16_t target_line = program_find_label(label);
-    if (target_line == 0)
+    uint8_t *line_ptr = program_find_line_label(label);
+    if (!line_ptr)
     {
-        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        vm_error_set(ERR_LABEL_NOT_FOUND);
         return;
     }
-    vm_goto_line(target_line);
+    vm_goto_line_ptr(line_ptr);
 }
 
 /* Push value onto expression stack */
@@ -129,7 +133,7 @@ void vm_push_value(double value)
 {
     if (g_vm.expr_stack.top >= EXPR_STACK_SIZE)
     {
-        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
+        vm_error_set(ERR_STACK_OVERFLOW);
         return;
     }
     g_vm.expr_stack.values[g_vm.expr_stack.top++] = value;
@@ -147,7 +151,7 @@ void vm_push_call(VMPosition return_pos)
 {
     if (g_vm.call_stack.top >= CALL_STACK_SIZE)
     {
-        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
+        vm_error_set(ERR_STACK_OVERFLOW);
         return;
     }
     g_vm.call_stack.frames[g_vm.call_stack.top].return_pos = return_pos;
@@ -159,7 +163,7 @@ bool vm_pop_call(VMPosition *return_pos)
 {
     if (g_vm.call_stack.top <= 0)
     {
-        error_set(ERR_RETURN_WITHOUT_GOSUB, g_vm.current_line);
+        vm_error_set(ERR_RETURN_WITHOUT_GOSUB);
         return false;
     }
     g_vm.call_stack.top--;
@@ -172,7 +176,7 @@ void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double 
 {
     if (g_vm.for_stack.top >= FOR_STACK_SIZE)
     {
-        error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
+        vm_error_set(ERR_STACK_OVERFLOW);
         return;
     }
     g_vm.for_stack.frames[g_vm.for_stack.top].pc_after_for = pc_after_for;
@@ -187,7 +191,7 @@ bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, doubl
 {
     if (g_vm.for_stack.top <= 0)
     {
-        error_set(ERR_NEXT_WITHOUT_FOR, g_vm.current_line);
+        vm_error_set(ERR_NEXT_WITHOUT_FOR);
         return false;
     }
     g_vm.for_stack.top--;
@@ -302,7 +306,7 @@ static double eval_term_auto(uint8_t **pc_ptr)
             double divisor = eval_power_auto(pc_ptr);
             if (divisor == 0.0)
             {
-                error_set(ERR_DIVISION_BY_ZERO, g_vm.current_line);
+                vm_error_set(ERR_DIVISION_BY_ZERO);
                 return 0.0;
             }
             result /= divisor;
@@ -330,7 +334,7 @@ static double eval_power_auto(uint8_t **pc_ptr)
         /* Check for math domain/overflow errors */
         if (!isfinite(result))
         {
-            error_set(ERR_MATH_OVERFLOW, g_vm.current_line);
+            vm_error_set(ERR_MATH_OVERFLOW);
             return 0.0;
         }
     }
@@ -360,13 +364,13 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (var_idx < 1 || var_idx > 26)
         { /* A-Z variables only */
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return 0.0;
         }
         VarCell *cell = &g_program.vars[var_idx - 1];
         if (cell->type != VAR_NUM)
         {
-            error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+            vm_error_set(ERR_TYPE_MISMATCH);
             return 0.0;
         }
         return cell->value.num;
@@ -389,14 +393,14 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return 0.0;
         }
 
         VarCell *cell = &g_program.vars[index - 1];
         if (cell->type != VAR_NUM)
         {
-            error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+            vm_error_set(ERR_TYPE_MISMATCH);
             return 0.0;
         }
         return cell->value.num;
@@ -412,7 +416,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         }
         else
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
         }
         return result;
     }
@@ -429,7 +433,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -445,7 +449,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -461,7 +465,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -477,7 +481,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -486,7 +490,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
             (*pc_ptr)++;
         if (arg < -1.0 || arg > 1.0)
         {
-            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            vm_error_set(ERR_MATH_DOMAIN);
             return 0.0;
         }
         double radians = asin(arg);
@@ -498,7 +502,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -507,7 +511,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
             (*pc_ptr)++;
         if (arg < -1.0 || arg > 1.0)
         {
-            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            vm_error_set(ERR_MATH_DOMAIN);
             return 0.0;
         }
         double radians = acos(arg);
@@ -519,7 +523,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -535,7 +539,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -544,7 +548,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
             (*pc_ptr)++;
         if (arg <= 0.0)
         {
-            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            vm_error_set(ERR_MATH_DOMAIN);
             return 0.0;
         }
         return log10(arg);
@@ -555,7 +559,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -564,7 +568,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
             (*pc_ptr)++;
         if (arg <= 0.0)
         {
-            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            vm_error_set(ERR_MATH_DOMAIN);
             return 0.0;
         }
         return log(arg);
@@ -575,7 +579,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -585,7 +589,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         double result = exp(arg);
         if (!isfinite(result))
         {
-            error_set(ERR_MATH_OVERFLOW, g_vm.current_line);
+            vm_error_set(ERR_MATH_OVERFLOW);
             return 0.0;
         }
         return result;
@@ -596,7 +600,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -605,7 +609,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
             (*pc_ptr)++;
         if (arg < 0.0)
         {
-            error_set(ERR_MATH_DOMAIN, g_vm.current_line);
+            vm_error_set(ERR_MATH_DOMAIN);
             return 0.0;
         }
         return sqrt(arg);
@@ -616,7 +620,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -631,7 +635,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -646,7 +650,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -666,7 +670,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -693,7 +697,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
         (*pc_ptr)++;
         if (**pc_ptr != T_LP)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return 0.0;
         }
         (*pc_ptr)++;
@@ -721,7 +725,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     }
 
     default:
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return 0.0;
     }
 }
@@ -756,7 +760,7 @@ static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
 
         if (var_idx < 1 || var_idx > 26)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return false;
         }
 
@@ -786,7 +790,7 @@ static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
         /* Check for T_ENDX terminator */
         if (**pc_ptr != T_ENDX)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
         (*pc_ptr)++; /* Skip T_ENDX */
@@ -794,7 +798,7 @@ static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return false;
         }
 
@@ -812,7 +816,7 @@ static bool eval_string_expression(uint8_t **pc_ptr, char *result_buffer)
     }
 
     default:
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return false;
     }
 }
@@ -837,14 +841,14 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         /* Get comparison operator - only = and <> supported for strings */
         if (*pc_ptr >= end)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
 
         uint8_t op = **pc_ptr;
         if (op != T_EQ && op != T_EQ_ASSIGN && op != T_NE)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
         (*pc_ptr)++;
@@ -863,7 +867,7 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         case T_NE:
             return cmp_result != 0;
         default:
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
     }
@@ -878,7 +882,7 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         /* Get comparison operator */
         if (*pc_ptr >= end)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
 
@@ -908,7 +912,7 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         case T_GE:
             return left_val >= right_val;
         default:
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return false;
         }
     }
@@ -991,6 +995,13 @@ void vm_execute_statement(void)
     if (!g_vm.pc || !g_vm.running)
         return;
 
+    if (program_is_last_line(g_vm.current_line_ptr))
+    {
+        /* At the last line (sentinel) - stop execution */
+        g_vm.running = false;
+        return;
+    }
+
     uint8_t token = *g_vm.pc;
     g_vm.pc++;
 
@@ -1034,7 +1045,7 @@ static void execute_var_assign(void)
     /* Expect = */
     if (*g_vm.pc != T_EQ_ASSIGN)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1048,7 +1059,7 @@ static void execute_var_assign(void)
     /* Store in variable */
     if (var_idx < 1 || var_idx > 26)
     { /* A-Z variables only */
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
 
@@ -1065,7 +1076,7 @@ static void execute_svar_assign(void)
     /* Expect = */
     if (*g_vm.pc != T_EQ_ASSIGN)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1073,7 +1084,7 @@ static void execute_svar_assign(void)
     /* For now, only handle string literals */
     if (*g_vm.pc != T_STR)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++; /* Skip T_STR */
@@ -1084,7 +1095,7 @@ static void execute_svar_assign(void)
     /* Store in string variable */
     if (var_idx < 1 || var_idx > 26)
     {
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
 
@@ -1127,7 +1138,7 @@ static void execute_vidx_assign(void)
     /* Expect = */
     if (*g_vm.pc != T_EQ_ASSIGN)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1142,7 +1153,7 @@ static void execute_vidx_assign(void)
     int index = (int)index_val;
     if (index < 1 || index > VARS_MAX)
     {
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
 
@@ -1164,7 +1175,7 @@ static void execute_svidx_assign(void)
     /* Expect = */
     if (*g_vm.pc != T_EQ_ASSIGN)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1172,7 +1183,7 @@ static void execute_svidx_assign(void)
     /* For now, only handle string literals */
     if (*g_vm.pc != T_STR)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++; /* Skip T_STR */
@@ -1184,7 +1195,7 @@ static void execute_svidx_assign(void)
     int index = (int)index_val;
     if (index < 1 || index > VARS_MAX)
     {
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
 
@@ -1224,7 +1235,7 @@ static void execute_let(void)
         /* Expect = */
         if (*g_vm.pc != T_EQ_ASSIGN)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return;
         }
         g_vm.pc++;
@@ -1238,7 +1249,7 @@ static void execute_let(void)
         /* Store in variable */
         if (var_idx < 1 || var_idx > 26)
         { /* A-Z variables only */
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1261,7 +1272,7 @@ static void execute_let(void)
         /* Expect = */
         if (*g_vm.pc != T_EQ_ASSIGN)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return;
         }
         g_vm.pc++;
@@ -1276,7 +1287,7 @@ static void execute_let(void)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1313,7 +1324,7 @@ static void print_expressions(void)
             uint8_t var_idx = *g_vm.pc++;
             if (var_idx < 1 || var_idx > 26)
             {
-                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                vm_error_set(ERR_INDEX_OUT_OF_RANGE);
                 return;
             }
             VarCell *cell = &g_program.vars[var_idx - 1];
@@ -1347,7 +1358,7 @@ static void print_expressions(void)
             int index = (int)index_val;
             if (index < 1 || index > VARS_MAX)
             {
-                error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+                vm_error_set(ERR_INDEX_OUT_OF_RANGE);
                 return;
             }
 
@@ -1394,7 +1405,7 @@ static void execute_goto(void)
         uint8_t str_len = *g_vm.pc++;
         if (str_len > STR_MAX)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return;
         }
         char label[STR_MAX + 1];
@@ -1412,12 +1423,11 @@ static void execute_goto(void)
 
         /* Get string variable value */
         VarCell *cell = var_get(var_idx);
-        if (!cell)
-            return; /* Error already set by var_get */
+        assert(cell); /* var_get never returns NULL - it calls error_report which never returns */
 
         if (cell->type != VAR_STR)
         {
-            error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+            vm_error_set(ERR_TYPE_MISMATCH);
             return;
         }
 
@@ -1458,7 +1468,7 @@ static void execute_gosub(void)
         uint8_t str_len = *g_vm.pc++;
         if (str_len > STR_MAX)
         {
-            error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+            vm_error_set(ERR_SYNTAX_ERROR);
             return;
         }
         char label[STR_MAX + 1];
@@ -1487,12 +1497,11 @@ static void execute_gosub(void)
 
         /* Get string variable value */
         VarCell *cell = var_get(var_idx);
-        if (!cell)
-            return; /* Error already set by var_get */
+        assert(cell); /* var_get never returns NULL - it calls error_report which never returns */
 
         if (cell->type != VAR_STR)
         {
-            error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+            vm_error_set(ERR_TYPE_MISMATCH);
             return;
         }
 
@@ -1541,7 +1550,7 @@ static void execute_for(void)
     /* FOR var = start TO limit [STEP step] */
     if (*g_vm.pc != T_VAR)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1550,7 +1559,7 @@ static void execute_for(void)
     /* Expect = */
     if (*g_vm.pc != T_EQ_ASSIGN)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1563,7 +1572,7 @@ static void execute_for(void)
     /* Skip TO */
     if (*g_vm.pc != T_TO)
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
     g_vm.pc++;
@@ -1586,64 +1595,24 @@ static void execute_for(void)
     /* Check for STEP = 0 error */
     if (step_val == 0.0)
     {
-        error_set(ERR_FOR_STEP_ZERO, g_vm.current_line);
+        vm_error_set(ERR_FOR_STEP_ZERO);
         return;
     }
 
     /* Store start value in loop variable */
     if (var_idx < 1 || var_idx > 26)
     {
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
     VarCell *cell = &g_program.vars[var_idx - 1];
     cell->type = VAR_NUM;
     cell->value.num = start_val;
 
-    /* Determine pc_after_for: either next statement on same line or next line */
+    /* We always jump back exactly here */
     VMPosition pc_after_for;
-    pc_after_for.line = g_vm.current_line;
-
-    /* Check if there are more statements on the current line */
-    if (*g_vm.pc == T_COLON)
-    {
-        /* There's a colon, so pc_after_for points to statement after colon */
-        pc_after_for.pc = g_vm.pc + 1; /* Skip the colon */
-    }
-    else
-    {
-        /* No more statements on current line, find start of next line */
-        uint8_t *next_line_pc = g_vm.pc;
-        while (*next_line_pc != T_EOL && next_line_pc < g_program.prog + g_program.prog_len)
-        {
-            next_line_pc = token_skip(next_line_pc);
-            if (!next_line_pc)
-                break;
-        }
-        if (*next_line_pc == T_EOL)
-        {
-            next_line_pc++; /* Skip T_EOL */
-            /* Skip line header (len + line_num) to get to tokens */
-            if (next_line_pc < g_program.prog + g_program.prog_len)
-            {
-                uint16_t next_line_num = *(uint16_t *)(next_line_pc + 2);
-                pc_after_for.line = next_line_num;
-                pc_after_for.pc = next_line_pc + 4; /* Skip len + line_num */
-            }
-            else
-            {
-                /* End of program */
-                pc_after_for.pc = NULL;
-                pc_after_for.line = 0;
-            }
-        }
-        else
-        {
-            /* Error - malformed program */
-            pc_after_for.pc = NULL;
-            pc_after_for.line = 0;
-        }
-    }
+    pc_after_for.line_ptr = g_vm.current_line_ptr;
+    pc_after_for.pc = g_vm.pc;
 
     vm_push_for(pc_after_for, var_idx, limit_val, step_val);
     if (error_get_code() != ERR_NONE)
@@ -1674,7 +1643,7 @@ static void execute_next(void)
         int frame_index;
         if (!vm_find_for_by_var(var_idx, &frame_index))
         {
-            error_set(ERR_NEXT_WITHOUT_FOR, g_vm.current_line);
+            vm_error_set(ERR_NEXT_WITHOUT_FOR);
             return;
         }
 
@@ -1700,13 +1669,13 @@ static void execute_next(void)
     /* Update loop variable */
     if (frame_var_idx < 1 || frame_var_idx > 26)
     {
-        error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+        vm_error_set(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
     VarCell *cell = &g_program.vars[frame_var_idx - 1];
     if (cell->type != VAR_NUM)
     {
-        error_set(ERR_TYPE_MISMATCH, g_vm.current_line);
+        vm_error_set(ERR_TYPE_MISMATCH);
         return;
     }
     cell->value.num += step;
@@ -1748,7 +1717,7 @@ static void execute_input(void)
 
         if (var_idx < 1 || var_idx > 26)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1772,7 +1741,7 @@ static void execute_input(void)
 
         if (var_idx < 1 || var_idx > 26)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1833,7 +1802,7 @@ static void execute_input(void)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1870,7 +1839,7 @@ static void execute_input(void)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1912,7 +1881,7 @@ static void execute_input(void)
     }
     else
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
 }
@@ -1928,7 +1897,7 @@ static void execute_aread(void)
 
         if (var_idx < 1 || var_idx > 26)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -1956,7 +1925,7 @@ static void execute_aread(void)
 
         if (var_idx < 1 || var_idx > 26)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -2000,7 +1969,7 @@ static void execute_aread(void)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -2041,7 +2010,7 @@ static void execute_aread(void)
         int index = (int)index_val;
         if (index < 1 || index > VARS_MAX)
         {
-            error_set(ERR_INDEX_OUT_OF_RANGE, g_vm.current_line);
+            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
             return;
         }
 
@@ -2066,7 +2035,7 @@ static void execute_aread(void)
     }
     else
     {
-        error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+        vm_error_set(ERR_SYNTAX_ERROR);
         return;
     }
 }
@@ -2123,7 +2092,7 @@ static void execute_using(void)
 
 static void execute_default(void)
 {
-    error_set(ERR_SYNTAX_ERROR, g_vm.current_line);
+    vm_error_set(ERR_SYNTAX_ERROR);
 }
 
 static void execute_rem(void)
@@ -2142,6 +2111,7 @@ static void execute_colon(void)
 
 static void execute_eol(void)
 {
+    assert(!program_is_last_line(g_vm.current_line_ptr));
     /* End of line - advance to next line */
     vm_next_line();
 }
@@ -2173,14 +2143,7 @@ static void execute_if(void)
                 if (!eval_string_expression(&g_vm.pc, label_str))
                     return;
 
-                uint16_t target_line = program_find_label(label_str);
-                if (target_line == 0)
-                {
-                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-                    return;
-                }
-
-                vm_goto_line(target_line);
+                vm_goto_label(label_str);
             }
             else
             {
@@ -2235,7 +2198,7 @@ void vm_run(void)
     }
 
     /* Main execution loop */
-    while (g_vm.running && error_get_code() == ERR_NONE)
+    while (g_vm.running && error_get_code() == ERR_NONE && !program_is_last_line(g_vm.current_line_ptr))
     {
         vm_execute_statement();
     }

@@ -118,7 +118,8 @@ typedef enum
     ERR_SYNTAX_ERROR = 11,
     ERR_LINE_TOO_LONG = 12,
     ERR_PROGRAM_TOO_LARGE = 13,
-    ERR_STACK_OVERFLOW = 14
+    ERR_STACK_OVERFLOW = 14,
+    ERR_LABEL_NOT_FOUND = 15 /* GOTO/GOSUB to non-existent label */
 } ErrorCode;
 
 #endif /* OPCODES_H */

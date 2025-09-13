@@ -5,6 +5,7 @@ The goal of this implementation is to serve as a model for writing 8 bits assemb
 * Use simple, direct code
 * Favor code that cannot fail/return NULL
 * Try not to repeat code, use helper functions
+* Avoid special cases (like empty arrays, NULL pointers, etc)
 * Use clear and consistent naming conventions
 * Use comments to explain non-obvious code
 
@@ -14,3 +15,6 @@ There is a test harness, that you can execute from the top-directory, using ./ru
 * Never remove a test, even when fixing a bug. You human will do it.
 * The test harness will help you to refactor the code, by checking that the behavior is unchanged. Run it often.
 
+Stylistic remarks
+* Use consistent indentation (4 spaces)
+* Favor < over > when comparing, unless comparing with a constant (ie: use ``if (a<b)``, but also `` if (a>0)``)
