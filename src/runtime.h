@@ -10,7 +10,7 @@ void cmd_list_line(uint16_t line_num);
 
 /* Token disassembly for debugging */
 void disassemble_program(void);
-void disassemble_line(LineRecord *line);
+void disassemble_line(uint8_t *line_ptr);
 void disassemble_tokens(const uint8_t *tokens, int len);
 
 /* Token name lookup */

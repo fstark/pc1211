@@ -25,6 +25,104 @@ void vm_init(void)
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
+    g_vm.current_line_ptr = NULL;
+}
+
+/* Core position management functions */
+
+/* Capture current position for stack storage */
+static VMPosition vm_capture_position(void)
+{
+    VMPosition pos;
+    pos.pc = g_vm.pc;
+    pos.line = g_vm.current_line;
+    return pos;
+}
+
+/* Restore position from captured state - this is the ONLY function that changes PC+line */
+static void vm_restore_position(VMPosition pos)
+{
+    g_vm.pc = pos.pc;
+    g_vm.current_line = pos.line;
+
+    /* Update current_line_ptr to match the line */
+    if (pos.line > 0)
+    {
+        g_vm.current_line_ptr = program_find_line(pos.line);
+    }
+    else
+    {
+        g_vm.current_line_ptr = NULL;
+    }
+}
+
+/* Start program at first line */
+static void vm_start_program(void)
+{
+    g_vm.current_line_ptr = program_first_line();
+    if (g_vm.current_line_ptr)
+    {
+        VMPosition pos;
+        pos.pc = get_tokens(g_vm.current_line_ptr);
+        pos.line = get_line(g_vm.current_line_ptr);
+        vm_restore_position(pos);
+        g_vm.running = true;
+    }
+    else
+    {
+        g_vm.running = false;
+    }
+}
+
+/* Advance to next line or end program */
+static void vm_next_line(void)
+{
+    if (!g_vm.current_line_ptr)
+    {
+        g_vm.running = false;
+        return;
+    }
+
+    g_vm.current_line_ptr = program_next_line(g_vm.current_line_ptr);
+    if (g_vm.current_line_ptr)
+    {
+        VMPosition pos;
+        pos.pc = get_tokens(g_vm.current_line_ptr);
+        pos.line = get_line(g_vm.current_line_ptr);
+        vm_restore_position(pos);
+    }
+    else
+    {
+        g_vm.running = false;
+    }
+}
+
+/* Go to specific line number - scans to find line */
+static void vm_goto_line(uint16_t target_line)
+{
+    uint8_t *line_ptr = program_find_line(target_line);
+    if (!line_ptr)
+    {
+        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        return;
+    }
+
+    VMPosition pos;
+    pos.pc = get_tokens(line_ptr);
+    pos.line = get_line(line_ptr);
+    vm_restore_position(pos);
+}
+
+/* Go to label - looks up label then goes to line */
+static void vm_goto_label(const char *label)
+{
+    uint16_t target_line = program_find_label(label);
+    if (target_line == 0)
+    {
+        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        return;
+    }
+    vm_goto_line(target_line);
 }
 
 /* Push value onto expression stack */
@@ -46,20 +144,19 @@ double vm_pop_value(void)
 }
 
 /* Push call frame onto call stack */
-void vm_push_call(uint8_t *return_pc, int return_line)
+void vm_push_call(VMPosition return_pos)
 {
     if (g_vm.call_stack.top >= CALL_STACK_SIZE)
     {
         error_set(ERR_STACK_OVERFLOW, g_vm.current_line);
         return;
     }
-    g_vm.call_stack.frames[g_vm.call_stack.top].return_pc = return_pc;
-    g_vm.call_stack.frames[g_vm.call_stack.top].return_line = return_line;
+    g_vm.call_stack.frames[g_vm.call_stack.top].return_pos = return_pos;
     g_vm.call_stack.top++;
 }
 
 /* Pop call frame from call stack */
-bool vm_pop_call(uint8_t **return_pc, int *return_line)
+bool vm_pop_call(VMPosition *return_pos)
 {
     if (g_vm.call_stack.top <= 0)
     {
@@ -67,13 +164,12 @@ bool vm_pop_call(uint8_t **return_pc, int *return_line)
         return false;
     }
     g_vm.call_stack.top--;
-    *return_pc = g_vm.call_stack.frames[g_vm.call_stack.top].return_pc;
-    *return_line = g_vm.call_stack.frames[g_vm.call_stack.top].return_line;
+    *return_pos = g_vm.call_stack.frames[g_vm.call_stack.top].return_pos;
     return true;
 }
 
 /* Push FOR frame onto FOR stack */
-void vm_push_for(uint8_t *pc_after_for, uint8_t var_idx, double limit, double step)
+void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double step)
 {
     if (g_vm.for_stack.top >= FOR_STACK_SIZE)
     {
@@ -88,7 +184,7 @@ void vm_push_for(uint8_t *pc_after_for, uint8_t var_idx, double limit, double st
 }
 
 /* Pop FOR frame from FOR stack */
-bool vm_pop_for(uint8_t **pc_after_for, uint8_t *var_idx, double *limit, double *step)
+bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, double *step)
 {
     if (g_vm.for_stack.top <= 0)
     {
@@ -1191,10 +1287,9 @@ static void execute_let(void)
     }
 }
 
-static void execute_print(void)
+/* Shared print logic used by both PRINT and PAUSE */
+static void print_expressions(void)
 {
-    /* Simple PRINT implementation */
-
     while (*g_vm.pc != T_COLON && *g_vm.pc != T_EOL)
     {
         if (*g_vm.pc == T_COMMA || *g_vm.pc == T_SEMI)
@@ -1277,6 +1372,13 @@ static void execute_print(void)
         }
     }
     printf("\n");
+}
+
+static void execute_print(void)
+{
+    /* Simple PRINT implementation */
+    print_expressions();
+
     /* PRINT clears AREAD after displaying */
     g_aread_value = 0.0;
     g_aread_string[0] = '\0';
@@ -1285,8 +1387,6 @@ static void execute_print(void)
 
 static void execute_goto(void)
 {
-    uint16_t target_line = 0;
-
     /* Check if next token is a string label (literal or variable) */
     if (*g_vm.pc == T_STR)
     {
@@ -1303,12 +1403,7 @@ static void execute_goto(void)
         label[str_len] = '\0';
         g_vm.pc += str_len;
 
-        target_line = program_find_label(label);
-        if (target_line == 0)
-        {
-            error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-            return;
-        }
+        vm_goto_label(label);
     }
     else if (*g_vm.pc == T_SVAR)
     {
@@ -1327,12 +1422,7 @@ static void execute_goto(void)
             return;
         }
 
-        target_line = program_find_label(cell->value.str);
-        if (target_line == 0)
-        {
-            error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-            return;
-        }
+        vm_goto_label(cell->value.str);
     }
     else
     {
@@ -1340,19 +1430,9 @@ static void execute_goto(void)
         double line_num = eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
-        target_line = (uint16_t)line_num;
-    }
 
-    /* Jump to line */
-    uint8_t *target = program_find_line_tokens(target_line);
-    if (!target)
-    {
-        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-        return;
+        vm_goto_line((uint16_t)line_num);
     }
-
-    g_vm.pc = target;
-    g_vm.current_line = target_line;
     /* Don't advance PC normally - handled by return */
 }
 
@@ -1368,7 +1448,8 @@ static void execute_stop(void)
 
 static void execute_gosub(void)
 {
-    uint16_t target_line = 0;
+    /* Capture current position for return */
+    VMPosition return_pos = vm_capture_position();
 
     /* Check if next token is a string label (literal or variable) */
     if (*g_vm.pc == T_STR)
@@ -1386,18 +1467,24 @@ static void execute_gosub(void)
         label[str_len] = '\0';
         g_vm.pc += str_len;
 
-        target_line = program_find_label(label);
-        if (target_line == 0)
-        {
-            error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        /* Update return position to point after the label */
+        return_pos.pc = g_vm.pc;
+
+        /* Push return address onto call stack */
+        vm_push_call(return_pos);
+        if (error_get_code() != ERR_NONE)
             return;
-        }
+
+        vm_goto_label(label);
     }
     else if (*g_vm.pc == T_SVAR)
     {
         /* String variable label */
         g_vm.pc++; /* Skip T_SVAR */
         uint8_t var_idx = *g_vm.pc++;
+
+        /* Update return position to point after the variable */
+        return_pos.pc = g_vm.pc;
 
         /* Get string variable value */
         VarCell *cell = var_get(var_idx);
@@ -1410,12 +1497,12 @@ static void execute_gosub(void)
             return;
         }
 
-        target_line = program_find_label(cell->value.str);
-        if (target_line == 0)
-        {
-            error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
+        /* Push return address onto call stack */
+        vm_push_call(return_pos);
+        if (error_get_code() != ERR_NONE)
             return;
-        }
+
+        vm_goto_label(cell->value.str);
     }
     else
     {
@@ -1423,40 +1510,31 @@ static void execute_gosub(void)
         double line_num = eval_expression_auto(&g_vm.pc);
         if (error_get_code() != ERR_NONE)
             return;
-        target_line = (uint16_t)line_num;
+
+        /* Update return position to point after the expression */
+        return_pos.pc = g_vm.pc;
+
+        /* Push return address onto call stack */
+        vm_push_call(return_pos);
+        if (error_get_code() != ERR_NONE)
+            return;
+
+        vm_goto_line((uint16_t)line_num);
     }
-
-    /* Push return address onto call stack */
-    vm_push_call(g_vm.pc, g_vm.current_line);
-    if (error_get_code() != ERR_NONE)
-        return;
-
-    /* Jump to subroutine */
-    uint8_t *target = program_find_line_tokens(target_line);
-    if (!target)
-    {
-        error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-        return;
-    }
-
-    g_vm.pc = target;
-    g_vm.current_line = target_line;
-    /* Don't advance PC normally - this is handled by returning early */
+    /* Don't advance PC normally - handled by jump */
 }
 
 static void execute_return(void)
 {
     /* Pop return address from call stack */
-    uint8_t *return_pc;
-    int return_line;
-    if (!vm_pop_call(&return_pc, &return_line))
+    VMPosition return_pos;
+    if (!vm_pop_call(&return_pos))
     {
         return; /* Error already set */
     }
 
-    g_vm.pc = return_pc;
-    g_vm.current_line = return_line;
-    /* Don't advance PC normally - this is handled by returning early */
+    vm_restore_position(return_pos);
+    /* Don't advance PC normally - this is handled by position restore */
 }
 
 static void execute_for(void)
@@ -1524,33 +1602,47 @@ static void execute_for(void)
     cell->value.num = start_val;
 
     /* Determine pc_after_for: either next statement on same line or next line */
-    uint8_t *pc_after_for;
+    VMPosition pc_after_for;
+    pc_after_for.line = g_vm.current_line;
 
     /* Check if there are more statements on the current line */
     if (*g_vm.pc == T_COLON)
     {
         /* There's a colon, so pc_after_for points to statement after colon */
-        pc_after_for = g_vm.pc + 1; /* Skip the colon */
+        pc_after_for.pc = g_vm.pc + 1; /* Skip the colon */
     }
     else
     {
-        /* No more statements on current line, jump to next line */
-        pc_after_for = g_vm.pc;
-        while (*pc_after_for != T_EOL)
+        /* No more statements on current line, find start of next line */
+        uint8_t *next_line_pc = g_vm.pc;
+        while (*next_line_pc != T_EOL && next_line_pc < g_program.prog + g_program.prog_len)
         {
-            pc_after_for = token_skip(pc_after_for);
-            if (!pc_after_for)
+            next_line_pc = token_skip(next_line_pc);
+            if (!next_line_pc)
                 break;
         }
-        if (*pc_after_for == T_EOL)
+        if (*next_line_pc == T_EOL)
         {
-            pc_after_for++; /* Skip T_EOL */
+            next_line_pc++; /* Skip T_EOL */
             /* Skip line header (len + line_num) to get to tokens */
-            if (pc_after_for < g_program.prog + g_program.prog_len)
+            if (next_line_pc < g_program.prog + g_program.prog_len)
             {
-                pc_after_for += 2; /* Skip u16 len */
-                pc_after_for += 2; /* Skip u16 line_num */
+                uint16_t next_line_num = *(uint16_t *)(next_line_pc + 2);
+                pc_after_for.line = next_line_num;
+                pc_after_for.pc = next_line_pc + 4; /* Skip len + line_num */
             }
+            else
+            {
+                /* End of program */
+                pc_after_for.pc = NULL;
+                pc_after_for.line = 0;
+            }
+        }
+        else
+        {
+            /* Error - malformed program */
+            pc_after_for.pc = NULL;
+            pc_after_for.line = 0;
         }
     }
 
@@ -1573,7 +1665,7 @@ static void execute_next(void)
         has_var = true;
     }
 
-    uint8_t *pc_after_for;
+    VMPosition pc_after_for_pos;
     uint8_t frame_var_idx;
     double limit, step;
 
@@ -1589,7 +1681,7 @@ static void execute_next(void)
 
         /* Get frame data */
         ForFrame *frame = &g_vm.for_stack.frames[frame_index];
-        pc_after_for = frame->pc_after_for;
+        pc_after_for_pos = frame->pc_after_for;
         frame_var_idx = frame->var_idx;
         limit = frame->limit;
         step = frame->step;
@@ -1600,7 +1692,7 @@ static void execute_next(void)
     else
     {
         /* Unnamed NEXT - use top FOR frame */
-        if (!vm_pop_for(&pc_after_for, &frame_var_idx, &limit, &step))
+        if (!vm_pop_for(&pc_after_for_pos, &frame_var_idx, &limit, &step))
         {
             return; /* Error already set */
         }
@@ -1634,28 +1726,14 @@ static void execute_next(void)
     if (continue_loop)
     {
         /* Push frame back and jump to after FOR */
-        vm_push_for(pc_after_for, frame_var_idx, limit, step);
+        vm_push_for(pc_after_for_pos, frame_var_idx, limit, step);
         if (error_get_code() != ERR_NONE)
             return;
 
-        g_vm.pc = pc_after_for;
+        /* Use vm_restore_position to jump cleanly */
+        vm_restore_position(pc_after_for_pos);
 
-        /* Update current line number if jumping to a different line */
-        /* Iterate through all lines to find which contains pc_after_for */
-        LineRecord *line = program_first_line();
-        while (line)
-        {
-            uint8_t *line_tokens = line->tokens;
-            uint8_t *line_end = program_find_line_end(line_tokens);
-            if (pc_after_for >= line_tokens && pc_after_for < line_end)
-            {
-                g_vm.current_line = line->line_num;
-                break;
-            }
-            line = program_next_line(line);
-        }
-
-        /* Don't advance PC normally - this is handled by returning early */
+        /* Don't advance PC normally - this is handled by position restore */
     }
     /* Loop finished - continue to next statement */
 }
@@ -2028,46 +2106,7 @@ static void execute_beep(void)
 static void execute_pause(void)
 {
     /* PAUSE works exactly like PRINT, then waits 100ms */
-
-    /* Print expressions just like PRINT statement */
-    while (*g_vm.pc != T_EOL && *g_vm.pc != T_COLON)
-    {
-        if (*g_vm.pc == T_STR)
-        {
-            g_vm.pc++; /* Skip T_STR token */
-            uint8_t len = *g_vm.pc++;
-            for (int i = 0; i < len; i++)
-            {
-                putchar(*g_vm.pc++);
-            }
-        }
-        else if (*g_vm.pc == T_COMMA)
-        {
-            printf("\t"); /* Tab for comma separator */
-            g_vm.pc++;
-        }
-        else if (*g_vm.pc == T_SEMI)
-        {
-            /* Semicolon - no extra space */
-            g_vm.pc++;
-        }
-        else
-        {
-            /* Evaluate and print numeric expression */
-            double value = vm_eval_expression_auto(&g_vm.pc);
-            if (error_get_code() != ERR_NONE)
-                return;
-
-            /* Print number with same formatting as PRINT */
-            if (value >= 0)
-                printf(" %.6g", value);
-            else
-                printf("%.6g", value);
-        }
-    }
-
-    printf("\n"); /* Always end with newline like PRINT */
-    fflush(stdout);
+    print_expressions();
 
     /* Wait 100ms */
     usleep(100000); /* 100,000 microseconds = 100ms */
@@ -2104,18 +2143,8 @@ static void execute_colon(void)
 
 static void execute_eol(void)
 {
-    /* End of line - find and advance to next line */
-    LineRecord *current_record = program_find_line(g_vm.current_line);
-    LineRecord *next_record = program_next_line(current_record);
-    if (next_record)
-    {
-        g_vm.pc = next_record->tokens;
-        g_vm.current_line = next_record->line_num;
-    }
-    else
-    {
-        g_vm.running = false;
-    }
+    /* End of line - advance to next line */
+    vm_next_line();
 }
 
 static void execute_if(void)
@@ -2152,15 +2181,7 @@ static void execute_if(void)
                     return;
                 }
 
-                uint8_t *target = program_find_line_tokens(target_line);
-                if (!target)
-                {
-                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-                    return;
-                }
-
-                g_vm.pc = target;
-                g_vm.current_line = target_line;
+                vm_goto_line(target_line);
             }
             else
             {
@@ -2169,15 +2190,7 @@ static void execute_if(void)
                 if (error_get_code() != ERR_NONE)
                     return;
 
-                uint8_t *target = program_find_line_tokens((int)line_num);
-                if (!target)
-                {
-                    error_set(ERR_BAD_LINE_NUMBER, g_vm.current_line);
-                    return;
-                }
-
-                g_vm.pc = target;
-                g_vm.current_line = (int)line_num;
+                vm_goto_line((int)line_num);
             }
         }
         else
@@ -2215,18 +2228,12 @@ void vm_run(void)
     error_clear();
 
     /* Start at first line */
-    g_vm.pc = program_first_line_tokens();
-    if (!g_vm.pc)
+    vm_start_program();
+    if (!g_vm.running)
     {
         printf("No program loaded\n");
         return;
     }
-
-    /* Extract line number from record header */
-    uint16_t line_num = *(uint16_t *)(g_vm.pc - 2);
-    g_vm.current_line = line_num;
-
-    g_vm.running = true;
 
     /* Main execution loop */
     while (g_vm.running && error_get_code() == ERR_NONE)

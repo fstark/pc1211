@@ -40,12 +40,12 @@ typedef struct
 } Program;
 
 /* Line record format: u16 len | u16 line | tokens... | T_EOL */
-typedef struct
-{
-    uint16_t len;      /* Total record length including header */
-    uint16_t line_num; /* Line number (1-999) */
-    uint8_t *tokens;   /* Start of token data */
-} LineRecord;
+/* Lines are accessed via uint8_t* pointers to the start of the record */
+
+/* Helper functions to access line record fields */
+static inline uint16_t get_len(uint8_t *line_ptr) { return *(uint16_t *)line_ptr; }
+static inline uint16_t get_line(uint8_t *line_ptr) { return *(uint16_t *)(line_ptr + 2); }
+static inline uint8_t *get_tokens(uint8_t *line_ptr) { return line_ptr + 4; }
 
 /* Global program state */
 extern Program g_program;
@@ -62,9 +62,9 @@ bool program_delete_line(uint16_t line_num);
 void program_add_label(const char *label, uint16_t line_num);
 uint16_t program_find_label(const char *label);
 void program_clear_labels(void);
-LineRecord *program_find_line(uint16_t line_num);
-LineRecord *program_first_line(void);
-LineRecord *program_next_line(LineRecord *current);
+uint8_t *program_find_line(uint16_t line_num);
+uint8_t *program_first_line(void);
+uint8_t *program_next_line(uint8_t *current_line);
 
 /* Variable management */
 void var_init_all(void);

@@ -2,7 +2,15 @@
 #define VM_H
 
 #include "opcodes.h"
+#include "program.h"
 #include <stdbool.h>
+
+/* VM position for capturing and restoring PC+line state */
+typedef struct
+{
+    uint8_t *pc;
+    int line;
+} VMPosition;
 
 /* Expression evaluation stack */
 #define EXPR_STACK_SIZE 32
@@ -16,8 +24,7 @@ typedef struct
 #define CALL_STACK_SIZE 16
 typedef struct
 {
-    uint8_t *return_pc; /* Where to return to */
-    int return_line;    /* Line number for error reporting */
+    VMPosition return_pos; /* Where to return to */
 } CallFrame;
 
 typedef struct
@@ -30,10 +37,10 @@ typedef struct
 #define FOR_STACK_SIZE 16
 typedef struct
 {
-    uint8_t *pc_after_for; /* PC after the FOR statement */
-    uint8_t var_idx;       /* Loop variable index (1-26 for A-Z) */
-    double limit;          /* TO value */
-    double step;           /* STEP value */
+    VMPosition pc_after_for; /* Position after the FOR statement */
+    uint8_t var_idx;         /* Loop variable index (1-26 for A-Z) */
+    double limit;            /* TO value */
+    double step;             /* STEP value */
 } ForFrame;
 
 typedef struct
@@ -53,13 +60,14 @@ typedef enum
 /* VM state */
 typedef struct
 {
-    uint8_t *pc;          /* Program counter (token pointer) */
-    int current_line;     /* Current line number for error reporting */
-    bool running;         /* VM running state */
-    AngleMode angle_mode; /* Trigonometric angle mode */
-    ExprStack expr_stack; /* Expression evaluation stack */
-    CallStack call_stack; /* GOSUB/RETURN call stack */
-    ForStack for_stack;   /* FOR/NEXT loop stack */
+    uint8_t *pc;               /* Program counter (token pointer) */
+    int current_line;          /* Current line number for error reporting */
+    bool running;              /* VM running state */
+    AngleMode angle_mode;      /* Trigonometric angle mode */
+    ExprStack expr_stack;      /* Expression evaluation stack */
+    CallStack call_stack;      /* GOSUB/RETURN call stack */
+    ForStack for_stack;        /* FOR/NEXT loop stack */
+    uint8_t *current_line_ptr; /* Current line pointer for efficient navigation */
 } VM;
 
 /* VM initialization and control */
@@ -77,12 +85,12 @@ double vm_pop_value(void);
 bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end);
 
 /* Call stack management */
-void vm_push_call(uint8_t *return_pc, int return_line);
-bool vm_pop_call(uint8_t **return_pc, int *return_line);
+void vm_push_call(VMPosition return_pos);
+bool vm_pop_call(VMPosition *return_pos);
 
 /* FOR loop stack management */
-void vm_push_for(uint8_t *pc_after_for, uint8_t var_idx, double limit, double step);
-bool vm_pop_for(uint8_t **pc_after_for, uint8_t *var_idx, double *limit, double *step);
+void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double step);
+bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, double *step);
 bool vm_find_for_by_var(uint8_t var_idx, int *frame_index);
 
 /* Statement execution */

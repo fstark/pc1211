@@ -148,35 +148,35 @@ const char *token_name(Tok token)
 /* LIST command - display readable program listing */
 void cmd_list(void)
 {
-    LineRecord *line = program_first_line();
+    uint8_t *line_ptr = program_first_line();
 
-    if (!line)
+    if (!line_ptr)
     {
         printf("No program loaded.\n");
         return;
     }
 
-    while (line)
+    while (line_ptr)
     {
-        cmd_list_line(line->line_num);
-        line = program_next_line(line);
+        cmd_list_line(get_line(line_ptr));
+        line_ptr = program_next_line(line_ptr);
     }
 }
 
 /* LIST a specific line */
 void cmd_list_line(uint16_t line_num)
 {
-    LineRecord *line = program_find_line(line_num);
-    if (!line)
+    uint8_t *line_ptr = program_find_line(line_num);
+    if (!line_ptr)
     {
         printf("Line %d not found.\n", line_num);
         return;
     }
 
-    printf("%d ", line->line_num);
+    printf("%d ", get_line(line_ptr));
 
-    const uint8_t *pos = line->tokens;
-    const uint8_t *end = line->tokens + line->len - 5; /* Subtract header and T_EOL */
+    const uint8_t *pos = get_tokens(line_ptr);
+    const uint8_t *end = get_tokens(line_ptr) + get_len(line_ptr) - 5; /* Subtract header and T_EOL */
     bool need_space = false;
 
     while (pos < end && *pos != T_EOL)
@@ -463,28 +463,28 @@ void cmd_list_line(uint16_t line_num)
 /* Disassemble program (debug dump) */
 void disassemble_program(void)
 {
-    LineRecord *line = program_first_line();
+    uint8_t *line_ptr = program_first_line();
 
-    if (!line)
+    if (!line_ptr)
     {
         printf("No program loaded.\n");
         return;
     }
 
     printf("Program dump:\n");
-    while (line)
+    while (line_ptr)
     {
-        disassemble_line(line);
-        line = program_next_line(line);
+        disassemble_line(line_ptr);
+        line_ptr = program_next_line(line_ptr);
     }
 }
 
 /* Disassemble a single line (debug dump) */
-void disassemble_line(LineRecord *line)
+void disassemble_line(uint8_t *line_ptr)
 {
-    printf("Line %d (len=%d):\n", line->line_num, line->len);
-    int token_len = line->len - 5; /* Subtract header and T_EOL */
-    disassemble_tokens(line->tokens, token_len);
+    printf("Line %d (len=%d):\n", get_line(line_ptr), get_len(line_ptr));
+    int token_len = get_len(line_ptr) - 5; /* Subtract header and T_EOL */
+    disassemble_tokens(get_tokens(line_ptr), token_len);
     printf("\n");
 }
 

@@ -178,80 +178,45 @@ bool program_delete_line(uint16_t line_num)
     return false; /* Line not found */
 }
 
-/* Find a line record by line number */
-LineRecord *program_find_line(uint16_t line_num)
+/* Find a line by line number */
+uint8_t *program_find_line(uint16_t target_line)
 {
-    static LineRecord record;
     uint8_t *pos = g_program.prog;
-    uint8_t *prog_end = g_program.prog + g_program.prog_len;
-
-    while (pos < prog_end)
+    while (get_len(pos) != 0)
     {
-        uint16_t len = *(uint16_t *)pos;
-        uint16_t existing_line = *(uint16_t *)(pos + 2);
-
-        if (existing_line == line_num)
-        {
-            record.len = len;
-            record.line_num = existing_line;
-            record.tokens = pos + 4;
-            return &record;
-        }
-
-        if (existing_line > line_num)
-        {
-            break; /* Line not found */
-        }
-
-        pos += len;
+        if (get_line(pos) == target_line)
+            return pos;
+        pos += get_len(pos);
     }
-
     return NULL;
 }
 
-/* Get first line record */
-LineRecord *program_first_line(void)
+/* Get first line */
+uint8_t *program_first_line(void)
 {
-    static LineRecord record;
-
     if (g_program.prog_len == 0)
-    {
         return NULL;
-    }
 
     uint8_t *pos = g_program.prog;
-    record.len = *(uint16_t *)pos;
-    record.line_num = *(uint16_t *)(pos + 2);
-    record.tokens = pos + 4;
+    if (get_len(pos) == 0)
+        return NULL;
 
-    return &record;
+    return pos;
 }
 
-/* Get next line record */
-LineRecord *program_next_line(LineRecord *current)
+/* Get next line */
+uint8_t *program_next_line(uint8_t *current_line)
 {
-    static LineRecord record;
-
-    if (!current)
-    {
+    if (!current_line)
         return NULL;
-    }
 
-    /* Calculate position of next record */
-    uint8_t *current_pos = current->tokens - 4; /* Back to start of record */
-    uint8_t *next_pos = current_pos + current->len;
+    uint8_t *next_pos = current_line + get_len(current_line);
     uint8_t *prog_end = g_program.prog + g_program.prog_len;
 
-    if (next_pos >= prog_end)
-    {
-        return NULL; /* No more lines */
-    }
+    if (next_pos >= prog_end || get_len(next_pos) == 0)
+        return NULL;
 
-    record.len = *(uint16_t *)next_pos;
-    record.line_num = *(uint16_t *)(next_pos + 2);
-    record.tokens = next_pos + 4;
-
-    return &record;
+    return next_pos;
 }
 
 /* Skip one token and return pointer to next */
@@ -372,8 +337,8 @@ void token_dump(const uint8_t *tokens, int len)
 /* Get token start for line */
 uint8_t *program_find_line_tokens(uint16_t line_num)
 {
-    LineRecord *record = program_find_line(line_num);
-    return record ? record->tokens : NULL;
+    uint8_t *line_ptr = program_find_line(line_num);
+    return line_ptr ? get_tokens(line_ptr) : NULL;
 }
 
 /* Find end of current line (find T_EOL) */
@@ -420,8 +385,8 @@ uint8_t *program_find_line_end_from_pos(uint8_t *pos)
 /* Get first line tokens */
 uint8_t *program_first_line_tokens(void)
 {
-    LineRecord *record = program_first_line();
-    return record ? record->tokens : NULL;
+    uint8_t *line_ptr = program_first_line();
+    return line_ptr ? get_tokens(line_ptr) : NULL;
 }
 
 /* Get next line tokens */
