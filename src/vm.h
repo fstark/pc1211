@@ -37,10 +37,10 @@ typedef struct
 #define FOR_STACK_SIZE 16
 typedef struct
 {
-    VMPosition pc_after_for; /* Position after the FOR statement */
-    uint8_t var_idx;         /* Loop variable index (1-26 for A-Z) */
-    double limit;            /* TO value */
-    double step;             /* STEP value */
+    VMPosition body; /* Position after the FOR statement */
+    uint8_t var_idx; /* Loop variable index (1-26 for A-Z) */
+    double limit;    /* TO value */
+    double step;     /* STEP value */
 } ForFrame;
 
 typedef struct
@@ -60,13 +60,20 @@ typedef enum
 /* VM state */
 typedef struct
 {
+    bool running;              /* VM running state */
     uint8_t *pc;               /* Program counter (token pointer) */
     uint8_t *current_line_ptr; /* Current line pointer */
-    bool running;              /* VM running state */
-    AngleMode angle_mode;      /* Trigonometric angle mode */
     ExprStack expr_stack;      /* Expression evaluation stack */
     CallStack call_stack;      /* GOSUB/RETURN call stack */
     ForStack for_stack;        /* FOR/NEXT loop stack */
+
+    /* AREAD state */
+    char aread_string[8]; /* AREAD string value */
+    double aread_value;   /* AREAD numeric value */
+    bool aread_is_string; /* Whether AREAD value is a string */
+
+    /* Modes */
+    AngleMode angle_mode; /* Trigonometric angle mode */
 } VM;
 
 /* VM initialization and control */
@@ -88,8 +95,8 @@ void vm_push_call(VMPosition return_pos);
 bool vm_pop_call(VMPosition *return_pos);
 
 /* FOR loop stack management */
-void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double step);
-bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, double *step);
+void vm_push_for(VMPosition body, uint8_t var_idx, double limit, double step);
+bool vm_pop_for(VMPosition *body, uint8_t *var_idx, double *limit, double *step);
 bool vm_find_for_by_var(uint8_t var_idx, int *frame_index);
 
 /* Statement execution */
@@ -101,8 +108,5 @@ double convert_angle_from_radians(double radians);
 
 /* Global VM state */
 extern VM g_vm;
-extern char g_aread_string[8]; /* AREAD string value (up to 7 chars + null) */
-extern double g_aread_value;   /* AREAD numeric value */
-extern bool g_aread_is_string; /* Whether AREAD value is a string */
 
 #endif /* VM_H */

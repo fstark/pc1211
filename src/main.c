@@ -5,7 +5,7 @@
 #include "opcodes.h"
 #include "program.h"
 #include "tokenizer.h"
-#include "runtime.h"
+#include "listing.h"
 #include "vm.h"
 #include "errors.h"
 
@@ -54,8 +54,8 @@ int main(int argc, char *argv[])
         {
             if (i + 1 < argc)
             {
-                g_aread_value = atof(argv[++i]);
-                g_aread_is_string = false;
+                g_vm.aread_value = atof(argv[++i]);
+                g_vm.aread_is_string = false;
             }
             else
             {
@@ -67,9 +67,9 @@ int main(int argc, char *argv[])
         {
             if (i + 1 < argc)
             {
-                strncpy(g_aread_string, argv[++i], sizeof(g_aread_string) - 1);
-                g_aread_string[sizeof(g_aread_string) - 1] = '\0';
-                g_aread_is_string = true;
+                strncpy(g_vm.aread_string, argv[++i], sizeof(g_vm.aread_string) - 1);
+                g_vm.aread_string[sizeof(g_vm.aread_string) - 1] = '\0';
+                g_vm.aread_is_string = true;
             }
             else
             {

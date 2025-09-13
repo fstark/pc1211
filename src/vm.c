@@ -11,9 +11,6 @@
 
 /* Global VM state */
 VM g_vm;
-char g_aread_string[8] = "";    /* AREAD string value */
-double g_aread_value = 0.0;     /* AREAD numeric value */
-bool g_aread_is_string = false; /* Whether AREAD value is a string */
 
 /* Initialize VM */
 void vm_init(void)
@@ -25,6 +22,11 @@ void vm_init(void)
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
+    
+    /* Initialize AREAD state */
+    g_vm.aread_string[0] = '\0';
+    g_vm.aread_value = 0.0;
+    g_vm.aread_is_string = false;
 }
 
 /* Core position management functions */
@@ -44,37 +46,29 @@ static void vm_restore_position(VMPosition pos)
     g_vm.current_line_ptr = pos.line_ptr;
 }
 
-/* Start program at first line */
-static void vm_start_program(void)
-{
-    // ####
-    g_vm.current_line_ptr = program_first_line();
-
-    /* Check if program has any executable lines */
-    if (get_len(g_vm.current_line_ptr) == 0)
-    {
-        /* Empty program - no lines to execute */
-        g_vm.running = false;
-    }
-    else
-    {
-        /* Program has lines - start execution */
-        VMPosition pos;
-        pos.pc = get_tokens(g_vm.current_line_ptr);
-        pos.line_ptr = g_vm.current_line_ptr;
-        vm_restore_position(pos);
-        g_vm.running = true;
-    }
-}
-
 void vm_goto_line_ptr(uint8_t *line_ptr)
 {
     program_validate_line_ptr(line_ptr);
+
+    if (program_is_last_line(line_ptr))
+    {
+        g_vm.current_line_ptr = line_ptr;
+        g_vm.pc = NULL;
+        g_vm.running = false;
+        return;
+    }
 
     VMPosition pos;
     pos.pc = get_tokens(line_ptr);
     pos.line_ptr = line_ptr;
     vm_restore_position(pos);
+}
+
+/* Start program at first line */
+static void vm_start_program(void)
+{
+    g_vm.running = true;
+    vm_goto_line_ptr(program_first_line());
 }
 
 /* Advance to next line or end program */
@@ -172,14 +166,14 @@ bool vm_pop_call(VMPosition *return_pos)
 }
 
 /* Push FOR frame onto FOR stack */
-void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double step)
+void vm_push_for(VMPosition body, uint8_t var_idx, double limit, double step)
 {
     if (g_vm.for_stack.top >= FOR_STACK_SIZE)
     {
         vm_error_set(ERR_STACK_OVERFLOW);
         return;
     }
-    g_vm.for_stack.frames[g_vm.for_stack.top].pc_after_for = pc_after_for;
+    g_vm.for_stack.frames[g_vm.for_stack.top].body = body;
     g_vm.for_stack.frames[g_vm.for_stack.top].var_idx = var_idx;
     g_vm.for_stack.frames[g_vm.for_stack.top].limit = limit;
     g_vm.for_stack.frames[g_vm.for_stack.top].step = step;
@@ -187,7 +181,7 @@ void vm_push_for(VMPosition pc_after_for, uint8_t var_idx, double limit, double 
 }
 
 /* Pop FOR frame from FOR stack */
-bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, double *step)
+bool vm_pop_for(VMPosition *body, uint8_t *var_idx, double *limit, double *step)
 {
     if (g_vm.for_stack.top <= 0)
     {
@@ -195,7 +189,7 @@ bool vm_pop_for(VMPosition *pc_after_for, uint8_t *var_idx, double *limit, doubl
         return false;
     }
     g_vm.for_stack.top--;
-    *pc_after_for = g_vm.for_stack.frames[g_vm.for_stack.top].pc_after_for;
+    *body = g_vm.for_stack.frames[g_vm.for_stack.top].body;
     *var_idx = g_vm.for_stack.frames[g_vm.for_stack.top].var_idx;
     *limit = g_vm.for_stack.frames[g_vm.for_stack.top].limit;
     *step = g_vm.for_stack.frames[g_vm.for_stack.top].step;
@@ -992,15 +986,8 @@ static execute_fn_t execute_table[256] = {
 /* Execute a single statement */
 void vm_execute_statement(void)
 {
-    if (!g_vm.pc || !g_vm.running)
-        return;
-
-    if (program_is_last_line(g_vm.current_line_ptr))
-    {
-        /* At the last line (sentinel) - stop execution */
-        g_vm.running = false;
-        return;
-    }
+    assert(g_vm.running);
+    assert(g_vm.pc);
 
     uint8_t token = *g_vm.pc;
     g_vm.pc++;
@@ -1008,33 +995,18 @@ void vm_execute_statement(void)
     /* Look up function in table */
     execute_fn_t execute_fn = execute_table[token];
 
-    if (execute_fn)
-    {
-        uint8_t *pc_after_advance = g_vm.pc; /* PC after the advance */
-        execute_fn();
+    if (!execute_fn)
+        execute_fn = execute_default;
 
-        /* If the function changed PC (GOTO, GOSUB, RETURN, NEXT jump, etc.)
-         * or stopped running (END, STOP), don't do normal PC advancement */
-        if (!g_vm.running || g_vm.pc != pc_after_advance)
-        {
-            return;
-        }
-    }
-    else
-    {
-        /* Handle unknown tokens */
-        execute_default();
-    }
+    execute_fn();
 }
 
 /* Statement execution helper function implementations */
 
 static void execute_label(void)
 {
-    /* Label - skip it */
     uint8_t str_len = *g_vm.pc++;
-    g_vm.pc += str_len; /* Skip the string data */
-    /* Label is now skipped, continue with next token */
+    g_vm.pc += str_len;
 }
 
 static void execute_var_assign(void)
@@ -1390,9 +1362,9 @@ static void execute_print(void)
     print_expressions();
 
     /* PRINT clears AREAD after displaying */
-    g_aread_value = 0.0;
-    g_aread_string[0] = '\0';
-    g_aread_is_string = false;
+    g_vm.aread_value = 0.0;
+    g_vm.aread_string[0] = '\0';
+    g_vm.aread_is_string = false;
 }
 
 static void execute_goto(void)
@@ -1610,11 +1582,11 @@ static void execute_for(void)
     cell->value.num = start_val;
 
     /* We always jump back exactly here */
-    VMPosition pc_after_for;
-    pc_after_for.line_ptr = g_vm.current_line_ptr;
-    pc_after_for.pc = g_vm.pc;
+    VMPosition body;
+    body.line_ptr = g_vm.current_line_ptr;
+    body.pc = g_vm.pc;
 
-    vm_push_for(pc_after_for, var_idx, limit_val, step_val);
+    vm_push_for(body, var_idx, limit_val, step_val);
     if (error_get_code() != ERR_NONE)
         return;
 }
@@ -1633,7 +1605,7 @@ static void execute_next(void)
         has_var = true;
     }
 
-    VMPosition pc_after_for_pos;
+    VMPosition body_pos;
     uint8_t frame_var_idx;
     double limit, step;
 
@@ -1649,7 +1621,7 @@ static void execute_next(void)
 
         /* Get frame data */
         ForFrame *frame = &g_vm.for_stack.frames[frame_index];
-        pc_after_for_pos = frame->pc_after_for;
+        body_pos = frame->body;
         frame_var_idx = frame->var_idx;
         limit = frame->limit;
         step = frame->step;
@@ -1660,7 +1632,7 @@ static void execute_next(void)
     else
     {
         /* Unnamed NEXT - use top FOR frame */
-        if (!vm_pop_for(&pc_after_for_pos, &frame_var_idx, &limit, &step))
+        if (!vm_pop_for(&body_pos, &frame_var_idx, &limit, &step))
         {
             return; /* Error already set */
         }
@@ -1694,12 +1666,12 @@ static void execute_next(void)
     if (continue_loop)
     {
         /* Push frame back and jump to after FOR */
-        vm_push_for(pc_after_for_pos, frame_var_idx, limit, step);
+        vm_push_for(body_pos, frame_var_idx, limit, step);
         if (error_get_code() != ERR_NONE)
             return;
 
         /* Use vm_restore_position to jump cleanly */
-        vm_restore_position(pc_after_for_pos);
+        vm_restore_position(body_pos);
 
         /* Don't advance PC normally - this is handled by position restore */
     }
@@ -1903,19 +1875,19 @@ static void execute_aread(void)
 
         VarCell *cell = &g_program.vars[var_idx - 1];
         cell->type = VAR_NUM;
-        if (g_aread_is_string)
+        if (g_vm.aread_is_string)
         {
             /* Convert string to number */
-            cell->value.num = atof(g_aread_string);
+            cell->value.num = atof(g_vm.aread_string);
         }
         else
         {
-            cell->value.num = g_aread_value;
+            cell->value.num = g_vm.aread_value;
         }
         /* Clear AREAD after use */
-        g_aread_value = 0.0;
-        g_aread_string[0] = '\0';
-        g_aread_is_string = false;
+        g_vm.aread_value = 0.0;
+        g_vm.aread_string[0] = '\0';
+        g_vm.aread_is_string = false;
     }
     else if (*g_vm.pc == T_SVAR)
     {
@@ -1932,21 +1904,21 @@ static void execute_aread(void)
         VarCell *cell = &g_program.vars[var_idx - 1];
         cell->type = VAR_STR;
 
-        if (g_aread_is_string)
+        if (g_vm.aread_is_string)
         {
             /* Use string directly */
-            strncpy(cell->value.str, g_aread_string, sizeof(cell->value.str) - 1);
+            strncpy(cell->value.str, g_vm.aread_string, sizeof(cell->value.str) - 1);
             cell->value.str[sizeof(cell->value.str) - 1] = '\0';
         }
         else
         {
             /* Convert numeric value to string */
-            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_aread_value);
+            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_vm.aread_value);
         }
         /* Clear AREAD after use */
-        g_aread_value = 0.0;
-        g_aread_string[0] = '\0';
-        g_aread_is_string = false;
+        g_vm.aread_value = 0.0;
+        g_vm.aread_string[0] = '\0';
+        g_vm.aread_is_string = false;
     }
     else if (*g_vm.pc == T_VIDX)
     {
@@ -1975,19 +1947,19 @@ static void execute_aread(void)
 
         VarCell *cell = &g_program.vars[index - 1];
         cell->type = VAR_NUM;
-        if (g_aread_is_string)
+        if (g_vm.aread_is_string)
         {
             /* Convert string to number */
-            cell->value.num = atof(g_aread_string);
+            cell->value.num = atof(g_vm.aread_string);
         }
         else
         {
-            cell->value.num = g_aread_value;
+            cell->value.num = g_vm.aread_value;
         }
         /* Clear AREAD after use */
-        g_aread_value = 0.0;
-        g_aread_string[0] = '\0';
-        g_aread_is_string = false;
+        g_vm.aread_value = 0.0;
+        g_vm.aread_string[0] = '\0';
+        g_vm.aread_is_string = false;
     }
     else if (*g_vm.pc == T_SVIDX)
     {
@@ -2017,21 +1989,21 @@ static void execute_aread(void)
         VarCell *cell = &g_program.vars[index - 1];
         cell->type = VAR_STR;
 
-        if (g_aread_is_string)
+        if (g_vm.aread_is_string)
         {
             /* Use string directly */
-            strncpy(cell->value.str, g_aread_string, sizeof(cell->value.str) - 1);
+            strncpy(cell->value.str, g_vm.aread_string, sizeof(cell->value.str) - 1);
             cell->value.str[sizeof(cell->value.str) - 1] = '\0';
         }
         else
         {
             /* Convert numeric value to string */
-            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_aread_value);
+            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_vm.aread_value);
         }
         /* Clear AREAD after use */
-        g_aread_value = 0.0;
-        g_aread_string[0] = '\0';
-        g_aread_is_string = false;
+        g_vm.aread_value = 0.0;
+        g_vm.aread_string[0] = '\0';
+        g_vm.aread_is_string = false;
     }
     else
     {
@@ -2080,9 +2052,9 @@ static void execute_pause(void)
     usleep(100000); /* 100,000 microseconds = 100ms */
 
     /* PAUSE clears AREAD after displaying */
-    g_aread_value = 0.0;
-    g_aread_string[0] = '\0';
-    g_aread_is_string = false;
+    g_vm.aread_value = 0.0;
+    g_vm.aread_string[0] = '\0';
+    g_vm.aread_is_string = false;
 }
 
 static void execute_using(void)

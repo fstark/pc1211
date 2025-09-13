@@ -7,7 +7,7 @@ SRCDIR = .
 TESTDIR = tests
 
 # Source files
-SOURCES = main.c program.c tokenizer.c runtime.c vm.c errors.c
+SOURCES = main.c program.c tokenizer.c listing.c vm.c errors.c
 OBJECTS = $(SOURCES:.c=.o)
 
 # Test files
@@ -54,9 +54,9 @@ help:
 	@echo "  ./pc1211 program.bas --dump"
 
 # Dependencies (basic - could be auto-generated)
-main.o: main.c opcodes.h program.h tokenizer.h runtime.h vm.h errors.h
+main.o: main.c opcodes.h program.h tokenizer.h listing.h vm.h errors.h
 program.o: program.c program.h opcodes.h errors.h
 tokenizer.o: tokenizer.c tokenizer.h program.h opcodes.h errors.h
-runtime.o: runtime.c runtime.h program.h opcodes.h errors.h
+listing.o: listing.c listing.h program.h opcodes.h errors.h
 vm.o: vm.c vm.h program.h opcodes.h errors.h
 errors.o: errors.c errors.h opcodes.h

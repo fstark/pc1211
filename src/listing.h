@@ -1,5 +1,5 @@
-#ifndef RUNTIME_H
-#define RUNTIME_H
+#ifndef LISTING_H
+#define LISTING_H
 
 #include "opcodes.h"
 #include "program.h"
@@ -16,4 +16,4 @@ void disassemble_tokens(const uint8_t *tokens, int len);
 /* Token name lookup */
 const char *token_name(Tok token);
 
-#endif /* RUNTIME_H */
+#endif /* LISTING_H */
