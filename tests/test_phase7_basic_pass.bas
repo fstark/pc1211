@@ -17,7 +17,7 @@
 170 PRINT "After CLEAR: A=", A, " B=", B, " A(5)=", A(5)
 180 REM
 190 PRINT "Testing device commands..."
-200 BEEP
+200 BEEP 1
 210 PAUSE "Waiting 100ms..."
 230 USING
 240 PRINT "Phase 7 complete!"

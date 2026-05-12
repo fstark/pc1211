@@ -9,6 +9,13 @@
 /* Forward declaration for recursive expression parsing */
 static bool tokenize_expression_recursive(Tokenizer *t, int *paren_count);
 
+/* Report syntax/tokenizer error with position tracking */
+static void tokenizer_error(Tokenizer *t, ErrorCode code)
+{
+    error_set_pos(t->pos);
+    error_report(code, t->line_num);
+}
+
 /* Keyword table - full names and abbreviations */
 static const Keyword keywords[] = {
     /* Functions */
@@ -52,7 +59,6 @@ static const Keyword keywords[] = {
     {"CLEAR", "CL.", T_CLEAR},
     {"BEEP", "B.", T_BEEP},
     {"PAUSE", "PA.", T_PAUSE},
-    {"AREAD", "A.", T_AREAD},
     {"USING", "U.", T_USING},
 
     {NULL, NULL, 0} /* Terminator */
@@ -107,7 +113,7 @@ void emit_token(Tokenizer *t, Tok token)
 {
     if (t->token_len >= TOKBUF_LINE_MAX)
     {
-        error_report(ERR_LINE_TOO_LONG, t->line_num);
+        tokenizer_error(t, ERR_LINE_TOO_LONG);
         return;
     }
     t->tokens[t->token_len++] = (uint8_t)token;
@@ -117,7 +123,7 @@ void emit_token_u8(Tokenizer *t, Tok token, uint8_t data)
 {
     if (t->token_len + 2 > TOKBUF_LINE_MAX)
     {
-        error_report(ERR_LINE_TOO_LONG, t->line_num);
+        tokenizer_error(t, ERR_LINE_TOO_LONG);
         return;
     }
     t->tokens[t->token_len++] = (uint8_t)token;
@@ -128,7 +134,7 @@ void emit_token_u16(Tokenizer *t, Tok token, uint16_t data)
 {
     if (t->token_len + 3 > TOKBUF_LINE_MAX)
     {
-        error_report(ERR_LINE_TOO_LONG, t->line_num);
+        tokenizer_error(t, ERR_LINE_TOO_LONG);
         return;
     }
     t->tokens[t->token_len++] = (uint8_t)token;
@@ -140,7 +146,7 @@ void emit_token_double(Tokenizer *t, Tok token, double data)
 {
     if (t->token_len + 9 > TOKBUF_LINE_MAX)
     {
-        error_report(ERR_LINE_TOO_LONG, t->line_num);
+        tokenizer_error(t, ERR_LINE_TOO_LONG);
         return;
     }
     t->tokens[t->token_len++] = (uint8_t)token;
@@ -153,7 +159,7 @@ void emit_token_string_unrestricted(Tokenizer *t, Tok token, const char *str, in
 {
     if (t->token_len + 2 + len > TOKBUF_LINE_MAX)
     {
-        error_report(ERR_LINE_TOO_LONG, t->line_num);
+        tokenizer_error(t, ERR_LINE_TOO_LONG);
         return;
     }
     t->tokens[t->token_len++] = (uint8_t)token;
@@ -216,7 +222,7 @@ bool parse_string(Tokenizer *t)
 
     if (t->input[t->pos] != '"')
     {
-        error_report(ERR_SYNTAX_ERROR, t->line_num);
+        tokenizer_error(t, ERR_SYNTAX_ERROR);
         return false;
     }
 
@@ -263,14 +269,14 @@ bool parse_variable(Tokenizer *t)
         {
             if (!tokenize_expression_recursive(t, &paren_count))
             {
-                error_report(ERR_SYNTAX_ERROR, t->line_num);
+                tokenizer_error(t, ERR_SYNTAX_ERROR);
                 return false;
             }
         }
 
         if (paren_count != 0)
         {
-            error_report(ERR_SYNTAX_ERROR, t->line_num);
+            tokenizer_error(t, ERR_SYNTAX_ERROR);
             return false;
         }
 
@@ -363,7 +369,7 @@ bool parse_keyword(Tokenizer *t)
     char word[32];
     if (len >= (int)sizeof(word))
     {
-        error_report(ERR_SYNTAX_ERROR, t->line_num);
+        tokenizer_error(t, ERR_SYNTAX_ERROR);
         return false;
     }
     strncpy(word, start, len);
@@ -388,7 +394,7 @@ bool parse_keyword(Tokenizer *t)
             {
                 if (!parse_number(t))
                 {
-                    error_report(ERR_SYNTAX_ERROR, t->line_num);
+                    tokenizer_error(t, ERR_SYNTAX_ERROR);
                     return false;
                 }
             }
@@ -407,7 +413,7 @@ bool parse_keyword(Tokenizer *t)
         return parse_variable(t);
     }
 
-    error_report(ERR_SYNTAX_ERROR, t->line_num);
+    tokenizer_error(t, ERR_SYNTAX_ERROR);
     return false;
 }
 
@@ -570,7 +576,7 @@ bool tokenize_line(const char *line, uint16_t line_num, uint8_t *tokens, int *to
 
         if (!parsed)
         {
-            error_report(ERR_SYNTAX_ERROR, line_num);
+            tokenizer_error(&t, ERR_SYNTAX_ERROR);
             return false;
         }
     }
@@ -622,6 +628,13 @@ bool tokenize_file(const char *filename)
             endptr++;
         }
 
+        /* Set source context for error reporting */
+        int content_offset = (int)(endptr - line_buffer);
+        error_set_source(line_buffer, content_offset);
+
+        /* Store source line for runtime error messages */
+        program_store_source((uint16_t)line_num, line_buffer);
+
         /* Tokenize the rest of the line */
         uint8_t tokens[TOKBUF_LINE_MAX];
         int token_len;
@@ -631,6 +644,8 @@ bool tokenize_file(const char *filename)
             fclose(file);
             return false;
         }
+
+        error_clear_source();
 
         /* Add to program */
         if (!program_add_line((uint16_t)line_num, tokens, token_len))

@@ -18,15 +18,11 @@ void vm_init(void)
     g_vm.pc = NULL;
     g_vm.current_line_ptr = NULL;
     g_vm.running = false;
+    g_vm.user_interrupted = false;
     g_vm.angle_mode = ANGLE_RADIAN; /* Default to radians */
     g_vm.expr_stack.top = 0;
     g_vm.call_stack.top = 0;
     g_vm.for_stack.top = 0;
-
-    /* Initialize AREAD state */
-    g_vm.aread_string[0] = '\0';
-    g_vm.aread_value = 0.0;
-    g_vm.aread_is_string = false;
 }
 
 /* Core position management functions */
@@ -65,7 +61,7 @@ void vm_goto_line_ptr(uint8_t *line_ptr)
 }
 
 /* Start program at first line */
-static void vm_start_program(void)
+void vm_start_program(void)
 {
     g_vm.running = true;
     vm_goto_line_ptr(program_first_line());
@@ -91,6 +87,9 @@ static void vm_next_line(void)
 
 void vm_error_set(ErrorCode code)
 {
+    /* Store token offset for source position mapping */
+    int offset = (int)(g_vm.pc - get_tokens(g_vm.current_line_ptr));
+    error_set_token_offset(offset);
     error_fatal(code, get_line(g_vm.current_line_ptr));
 }
 
@@ -99,6 +98,26 @@ void vm_error_if(bool condition, ErrorCode code)
     if (condition)
     {
         vm_error_set(code);
+    }
+}
+
+/* User interruption handling */
+void vm_set_user_interrupted(void)
+{
+    g_vm.user_interrupted = true;
+}
+
+void vm_clear_user_interrupted(void)
+{
+    g_vm.user_interrupted = false;
+}
+
+void vm_check_user_interrupted(void)
+{
+    if (g_vm.user_interrupted)
+    {
+        g_vm.user_interrupted = false; /* Clear the flag */
+        vm_error_set(ERR_USER_INTERRUPTED);
     }
 }
 
@@ -360,11 +379,8 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     {
         (*pc_ptr)++;
         double result = eval_expression_auto(pc_ptr);
-        if (**pc_ptr == T_RP)
-        {
-            (*pc_ptr)++;
-        }
         vm_error_if(**pc_ptr != T_RP, ERR_SYNTAX_ERROR);
+        (*pc_ptr)++;
         return result;
     }
 
@@ -523,7 +539,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_SGN:
     {
         (*pc_ptr)++;
-    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -539,7 +555,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_DMS:
     {
         (*pc_ptr)++;
-    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -562,7 +578,7 @@ static double eval_factor_auto(uint8_t **pc_ptr)
     case T_DEG:
     {
         (*pc_ptr)++;
-    vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
+        vm_error_if(**pc_ptr != T_LP, ERR_SYNTAX_ERROR);
         (*pc_ptr)++;
         double arg = eval_expression_auto(pc_ptr);
         if (**pc_ptr == T_RP)
@@ -799,7 +815,6 @@ static void execute_next(void);
 static void execute_end(void);
 static void execute_stop(void);
 static void execute_input(void);
-static void execute_aread(void);
 static void execute_degree(void);
 static void execute_radian(void);
 static void execute_grad(void);
@@ -843,7 +858,6 @@ static execute_fn_t execute_table[256] = {
     [T_CLEAR] = execute_clear,
     [T_BEEP] = execute_beep,
     [T_PAUSE] = execute_pause,
-    [T_AREAD] = execute_aread,
     [T_USING] = execute_using,
 
     /* Default handler for all other tokens */
@@ -1099,7 +1113,6 @@ static void execute_let(void)
     else if (next_token == T_VIDX)
     {
         g_vm.pc++; /* Skip T_VIDX */
-        g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index */
         double index_val = vm_eval_expression_auto(&g_vm.pc);
@@ -1227,11 +1240,6 @@ static void execute_print(void)
 {
     /* Simple PRINT implementation */
     print_expressions();
-
-    /* PRINT clears AREAD after displaying */
-    g_vm.aread_value = 0.0;
-    g_vm.aread_string[0] = '\0';
-    g_vm.aread_is_string = false;
 }
 
 static void execute_goto(void)
@@ -1624,7 +1632,6 @@ static void execute_input(void)
     {
         /* Indexed numeric variable */
         g_vm.pc++; /* Skip T_VIDX */
-        g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
         double index_val = vm_eval_expression_auto(&g_vm.pc);
@@ -1661,7 +1668,6 @@ static void execute_input(void)
     {
         /* Indexed string variable */
         g_vm.pc++; /* Skip T_SVIDX */
-        g_vm.pc++; /* Skip placeholder byte */
 
         /* Evaluate index expression */
         double index_val = vm_eval_expression_auto(&g_vm.pc);
@@ -1725,160 +1731,6 @@ static void execute_input(void)
     }
 }
 
-static void execute_aread(void)
-{
-    /* AREAD variable - read previous screen value into variable */
-    if (*g_vm.pc == T_VAR)
-    {
-        /* Numeric variable */
-        g_vm.pc++; /* Skip T_VAR */
-        uint8_t var_idx = *g_vm.pc++;
-
-        if (var_idx < 1 || var_idx > 26)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[var_idx - 1];
-        cell->type = VAR_NUM;
-        if (g_vm.aread_is_string)
-        {
-            /* Convert string to number */
-            cell->value.num = atof(g_vm.aread_string);
-        }
-        else
-        {
-            cell->value.num = g_vm.aread_value;
-        }
-        /* Clear AREAD after use */
-        g_vm.aread_value = 0.0;
-        g_vm.aread_string[0] = '\0';
-        g_vm.aread_is_string = false;
-    }
-    else if (*g_vm.pc == T_SVAR)
-    {
-        /* String variable */
-        g_vm.pc++; /* Skip T_SVAR */
-        uint8_t var_idx = *g_vm.pc++;
-
-        if (var_idx < 1 || var_idx > 26)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[var_idx - 1];
-        cell->type = VAR_STR;
-
-        if (g_vm.aread_is_string)
-        {
-            /* Use string directly */
-            strncpy(cell->value.str, g_vm.aread_string, sizeof(cell->value.str) - 1);
-            cell->value.str[sizeof(cell->value.str) - 1] = '\0';
-        }
-        else
-        {
-            /* Convert numeric value to string */
-            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_vm.aread_value);
-        }
-        /* Clear AREAD after use */
-        g_vm.aread_value = 0.0;
-        g_vm.aread_string[0] = '\0';
-        g_vm.aread_is_string = false;
-    }
-    else if (*g_vm.pc == T_VIDX)
-    {
-        /* Indexed numeric variable */
-        g_vm.pc++; /* Skip T_VIDX */
-        g_vm.pc++; /* Skip placeholder byte */
-
-        /* Evaluate index expression */
-        double index_val = vm_eval_expression_auto(&g_vm.pc);
-        if (error_get_code() != ERR_NONE)
-            return;
-
-        /* Skip T_ENDX terminator */
-        if (*g_vm.pc == T_ENDX)
-        {
-            g_vm.pc++;
-        }
-
-        /* Convert to integer index */
-        int index = (int)index_val;
-        if (index < 1 || index > VARS_MAX)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[index - 1];
-        cell->type = VAR_NUM;
-        if (g_vm.aread_is_string)
-        {
-            /* Convert string to number */
-            cell->value.num = atof(g_vm.aread_string);
-        }
-        else
-        {
-            cell->value.num = g_vm.aread_value;
-        }
-        /* Clear AREAD after use */
-        g_vm.aread_value = 0.0;
-        g_vm.aread_string[0] = '\0';
-        g_vm.aread_is_string = false;
-    }
-    else if (*g_vm.pc == T_SVIDX)
-    {
-        /* Indexed string variable */
-        g_vm.pc++; /* Skip T_SVIDX */
-        g_vm.pc++; /* Skip placeholder byte */
-
-        /* Evaluate index expression */
-        double index_val = vm_eval_expression_auto(&g_vm.pc);
-        if (error_get_code() != ERR_NONE)
-            return;
-
-        /* Skip T_ENDX terminator */
-        if (*g_vm.pc == T_ENDX)
-        {
-            g_vm.pc++;
-        }
-
-        /* Convert to integer index */
-        int index = (int)index_val;
-        if (index < 1 || index > VARS_MAX)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[index - 1];
-        cell->type = VAR_STR;
-
-        if (g_vm.aread_is_string)
-        {
-            /* Use string directly */
-            strncpy(cell->value.str, g_vm.aread_string, sizeof(cell->value.str) - 1);
-            cell->value.str[sizeof(cell->value.str) - 1] = '\0';
-        }
-        else
-        {
-            /* Convert numeric value to string */
-            snprintf(cell->value.str, sizeof(cell->value.str), "%.6g", g_vm.aread_value);
-        }
-        /* Clear AREAD after use */
-        g_vm.aread_value = 0.0;
-        g_vm.aread_string[0] = '\0';
-        g_vm.aread_is_string = false;
-    }
-    else
-    {
-        vm_error_set(ERR_SYNTAX_ERROR);
-        return;
-    }
-}
-
 static void execute_degree(void)
 {
     g_vm.angle_mode = ANGLE_DEGREE;
@@ -1897,7 +1749,7 @@ static void execute_grad(void)
 static void execute_clear(void)
 {
     /* Clear all variables A-Z and indexed variables A(1) through A(VARS_MAX) */
-    for (int i = 0; i <= VARS_MAX; i++)
+    for (int i = 0; i < VARS_MAX; i++)
     {
         g_program.vars[i].type = VAR_NUM;
         g_program.vars[i].value.num = 0.0;
@@ -1906,7 +1758,17 @@ static void execute_clear(void)
 
 static void execute_beep(void)
 {
-    putchar('\a'); /* ASCII bell character */
+    /* BEEP <expression> — beep N times (integer part of expression) */
+    double val = vm_eval_expression_auto(&g_vm.pc);
+    if (error_get_code() != ERR_NONE)
+        return;
+    int count = (int)val;
+    if (count < 1)
+        count = 1;
+    for (int i = 0; i < count; i++)
+    {
+        putchar('\a');
+    }
     fflush(stdout);
 }
 
@@ -1917,11 +1779,6 @@ static void execute_pause(void)
 
     /* Wait 100ms */
     usleep(100000); /* 100,000 microseconds = 100ms */
-
-    /* PAUSE clears AREAD after displaying */
-    g_vm.aread_value = 0.0;
-    g_vm.aread_string[0] = '\0';
-    g_vm.aread_is_string = false;
 }
 
 static void execute_using(void)
@@ -2042,7 +1899,9 @@ void vm_run(void)
     /* Main execution loop */
     while (g_vm.running && !program_is_last_line(g_vm.current_line_ptr))
     {
+        vm_clear_user_interrupted();
         vm_execute_statement();
+        vm_check_user_interrupted();
     }
 
     return;

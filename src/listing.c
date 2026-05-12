@@ -135,8 +135,6 @@ const char *token_name(Tok token)
         return "BEEP";
     case T_PAUSE:
         return "PAUSE";
-    case T_AREAD:
-        return "AREAD";
     case T_USING:
         return "USING";
 
@@ -145,17 +143,8 @@ const char *token_name(Tok token)
     }
 }
 
-/* LIST command - display readable program listing */
-void cmd_list(void)
-{
-    for (uint8_t *line_ptr = program_first_line(); !program_is_last_line(line_ptr); line_ptr += get_len(line_ptr))
-    {
-        cmd_list_line(get_line(line_ptr));
-    }
-}
-
 /* LIST a specific line */
-void cmd_list_line(uint16_t line_num)
+void cmd_list_line_to_file(FILE *file, uint16_t line_num)
 {
     uint8_t *line_ptr = program_find_line(line_num);
     if (!line_ptr)
@@ -164,7 +153,7 @@ void cmd_list_line(uint16_t line_num)
         return;
     }
 
-    printf("%d ", get_line(line_ptr));
+    fprintf(file, "%d ", get_line(line_ptr));
 
     const uint8_t *pos = get_tokens(line_ptr);
     const uint8_t *end = get_tokens(line_ptr) + get_len(line_ptr) - 5; /* Subtract header and T_EOL */
@@ -174,7 +163,7 @@ void cmd_list_line(uint16_t line_num)
     {
         if (need_space)
         {
-            printf(" ");
+            fprintf(file, " ");
         }
         need_space = true;
 
@@ -183,7 +172,7 @@ void cmd_list_line(uint16_t line_num)
         case T_NUM:
         {
             double val = *(double *)(pos + 1);
-            printf("%g", val);
+            fprintf(file, "%g", val);
             pos += 9;
             break;
         }
@@ -191,33 +180,33 @@ void cmd_list_line(uint16_t line_num)
         case T_STR:
         {
             uint8_t len = pos[1];
-            printf("\"");
+            fprintf(file, "\"");
             for (int i = 0; i < len; i++)
             {
-                putchar(pos[2 + i]);
+                fprintf(file, "%c", pos[2 + i]);
             }
-            printf("\"");
+            fprintf(file, "\"");
             pos += 2 + len;
             break;
         }
 
         case T_VAR:
         {
-            printf("%c", 'A' + pos[1] - 1);
+            fprintf(file, "%c", 'A' + pos[1] - 1);
             pos += 2;
             break;
         }
 
         case T_SVAR:
         {
-            printf("%c$", 'A' + pos[1] - 1);
+            fprintf(file, "%c$", 'A' + pos[1] - 1);
             pos += 2;
             break;
         }
 
         case T_VIDX:
         {
-            printf("A(");
+            fprintf(file, "A(");
             pos++;
             /* Parse expression until T_ENDX */
             int paren_level = 0;
@@ -234,48 +223,48 @@ void cmd_list_line(uint16_t line_num)
                 case T_NUM:
                 {
                     double val = *(double *)(pos + 1);
-                    printf("%g", val);
+                    fprintf(file, "%g", val);
                     pos += 9;
                     break;
                 }
                 case T_VAR:
                 {
-                    printf("%c", 'A' + pos[1] - 1);
+                    fprintf(file, "%c", 'A' + pos[1] - 1);
                     pos += 2;
                     break;
                 }
                 case T_SVAR:
                 {
-                    printf("%c$", 'A' + pos[1] - 1);
+                    fprintf(file, "%c$", 'A' + pos[1] - 1);
                     pos += 2;
                     break;
                 }
                 case T_PLUS:
-                    printf("+");
+                    fprintf(file, "+");
                     pos++;
                     break;
                 case T_MINUS:
-                    printf("-");
+                    fprintf(file, "-");
                     pos++;
                     break;
                 case T_MUL:
-                    printf("*");
+                    fprintf(file, "*");
                     pos++;
                     break;
                 case T_DIV:
-                    printf("/");
+                    fprintf(file, "/");
                     pos++;
                     break;
                 case T_POW:
-                    printf("^");
+                    fprintf(file, "^");
                     pos++;
                     break;
                 case T_LP:
-                    printf("(");
+                    fprintf(file, "(");
                     pos++;
                     break;
                 case T_RP:
-                    printf(")");
+                    fprintf(file, ")");
                     pos++;
                     break;
                 default:
@@ -287,13 +276,13 @@ void cmd_list_line(uint16_t line_num)
             {
                 pos++;
             }
-            printf(")");
+            fprintf(file, ")");
             break;
         }
 
         case T_SVIDX:
         {
-            printf("A$(");
+            fprintf(file, "A$(");
             pos++;
             /* Parse expression until T_ENDX */
             int paren_level = 0;
@@ -310,48 +299,48 @@ void cmd_list_line(uint16_t line_num)
                 case T_NUM:
                 {
                     double val = *(double *)(pos + 1);
-                    printf("%g", val);
+                    fprintf(file, "%g", val);
                     pos += 9;
                     break;
                 }
                 case T_VAR:
                 {
-                    printf("%c", 'A' + pos[1] - 1);
+                    fprintf(file, "%c", 'A' + pos[1] - 1);
                     pos += 2;
                     break;
                 }
                 case T_SVAR:
                 {
-                    printf("%c$", 'A' + pos[1] - 1);
+                    fprintf(file, "%c$", 'A' + pos[1] - 1);
                     pos += 2;
                     break;
                 }
                 case T_PLUS:
-                    printf("+");
+                    fprintf(file, "+");
                     pos++;
                     break;
                 case T_MINUS:
-                    printf("-");
+                    fprintf(file, "-");
                     pos++;
                     break;
                 case T_MUL:
-                    printf("*");
+                    fprintf(file, "*");
                     pos++;
                     break;
                 case T_DIV:
-                    printf("/");
+                    fprintf(file, "/");
                     pos++;
                     break;
                 case T_POW:
-                    printf("^");
+                    fprintf(file, "^");
                     pos++;
                     break;
                 case T_LP:
-                    printf("(");
+                    fprintf(file, "(");
                     pos++;
                     break;
                 case T_RP:
-                    printf(")");
+                    fprintf(file, ")");
                     pos++;
                     break;
                 default:
@@ -363,22 +352,22 @@ void cmd_list_line(uint16_t line_num)
             {
                 pos++;
             }
-            printf(")");
+            fprintf(file, ")");
             break;
         }
 
         case T_REM:
         {
-            printf("REM");
+            fprintf(file, "REM");
             pos++;
             /* Check if followed by comment string */
             if (pos < end && *pos == T_STR)
             {
-                printf(" ");
+                fprintf(file, " ");
                 uint8_t len = pos[1];
                 for (int i = 0; i < len; i++)
                 {
-                    putchar(pos[2 + i]);
+                    fprintf(file, "%c", pos[2 + i]);
                 }
                 pos += 2 + len;
             }
@@ -388,7 +377,7 @@ void cmd_list_line(uint16_t line_num)
         case T_GOTO:
         case T_GOSUB:
         {
-            printf("%s", token_name(*pos));
+            fprintf(file, "%s", token_name(*pos));
             pos++;
             if (pos + 1 < end)
             {
@@ -396,7 +385,7 @@ void cmd_list_line(uint16_t line_num)
                 if (*pos == T_NUM)
                 {
                     double line_val = *(double *)(pos + 1);
-                    printf(" %g", line_val);
+                    fprintf(file, " %g", line_val);
                     pos += 9;
                 }
                 else
@@ -409,83 +398,73 @@ void cmd_list_line(uint16_t line_num)
 
         case T_THEN:
         {
-            printf("THEN");
+            fprintf(file, "THEN");
             pos++;
             if (pos < end && *pos == T_NUM)
             {
-                printf(" ");
+                fprintf(file, " ");
                 double line_val = *(double *)(pos + 1);
-                printf("%g", line_val);
+                fprintf(file, "%g", line_val);
                 pos += 9;
             }
             break;
         }
 
         case T_COMMA:
-            printf(",");
+            fprintf(file, ",");
             need_space = false; /* No space after comma */
             pos++;
             break;
 
         case T_SEMI:
-            printf(";");
+            fprintf(file, ";");
             need_space = false; /* No space after semicolon */
             pos++;
             break;
 
         case T_COLON:
-            printf(" : ");
+            fprintf(file, " : ");
             need_space = false; /* Spaces already included */
             pos++;
             break;
 
         default:
         {
-            printf("%s", token_name(*pos));
+            fprintf(file, "%s", token_name(*pos));
             pos++;
             break;
         }
         }
     }
 
-    printf("\n");
+    fprintf(file, "\n");
 }
 
-/* Disassemble program (debug dump) */
-void disassemble_program(void)
+/* LIST command - display readable program listing to file */
+void cmd_list(FILE *file)
 {
-    printf("Program dump:\n");
-    for (uint8_t *line_ptr = program_first_line(); get_len(line_ptr) != 0; line_ptr += get_len(line_ptr))
+    for (uint8_t *line_ptr = program_first_line(); !program_is_last_line(line_ptr); line_ptr += get_len(line_ptr))
     {
-        disassemble_line(line_ptr);
+        cmd_list_line_to_file(file, get_line(line_ptr));
     }
 }
 
-/* Disassemble a single line (debug dump) */
-void disassemble_line(uint8_t *line_ptr)
-{
-    printf("Line %d (len=%d):\n", get_line(line_ptr), get_len(line_ptr));
-    int token_len = get_len(line_ptr) - 5; /* Subtract header and T_EOL */
-    disassemble_tokens(get_tokens(line_ptr), token_len);
-    printf("\n");
-}
-
 /* Disassemble token stream (debug dump) */
-void disassemble_tokens(const uint8_t *tokens, int len)
+void dump_tokens(FILE *file, const uint8_t *tokens, int len)
 {
     const uint8_t *pos = tokens;
     const uint8_t *end = tokens + len;
 
     while (pos < end && *pos != T_EOL)
     {
-        printf("  %02X %s", *pos, token_name(*pos));
+        fprintf(file, "  %02X %s", *pos, token_name(*pos));
 
         switch (*pos)
         {
         case T_NUM:
         {
             double val = *(double *)(pos + 1);
-            printf(" (%g)", val);
+            fprintf(file, " (%g)", val);
             pos += 9;
             break;
         }
@@ -493,37 +472,37 @@ void disassemble_tokens(const uint8_t *tokens, int len)
         case T_STR:
         {
             uint8_t str_len = pos[1];
-            printf(" [%d] (\"", str_len);
+            fprintf(file, " [%d] (\"", str_len);
             for (int i = 0; i < str_len; i++)
             {
-                putchar(pos[2 + i]);
+                printf("%c", pos[2 + i]);
             }
-            printf("\")");
+            fprintf(file, "\")");
             pos += 2 + str_len;
             break;
         }
 
         case T_VAR:
-            printf(" (%c)", 'A' + pos[1] - 1);
+            fprintf(file, " (%c)", 'A' + pos[1] - 1);
             pos += 2;
             break;
 
         case T_SVAR:
-            printf(" (%c$)", 'A' + pos[1] - 1);
+            fprintf(file, " (%c$)", 'A' + pos[1] - 1);
             pos += 2;
             break;
 
         case T_SVIDX:
-            printf(" (A$(");
+            fprintf(file, " (A$(");
             pos += 2;
             while (pos < end && *pos != T_ENDX)
             {
-                printf("%02X ", *pos);
+                fprintf(file, "%02X ", *pos);
                 pos++;
             }
             if (pos < end && *pos == T_ENDX)
             {
-                printf("))");
+                fprintf(file, "))");
                 pos++;
             }
             break;
@@ -534,7 +513,7 @@ void disassemble_tokens(const uint8_t *tokens, int len)
             if (pos < end && *pos == T_NUM)
             {
                 double line_val = *(double *)(pos + 1);
-                printf(" -> %g", line_val);
+                fprintf(file, " -> %g", line_val);
                 pos += 9;
             }
             break;
@@ -544,7 +523,7 @@ void disassemble_tokens(const uint8_t *tokens, int len)
             if (pos < end && *pos == T_NUM)
             {
                 double line_val = *(double *)(pos + 1);
-                printf(" -> %g", line_val);
+                fprintf(file, " -> %g", line_val);
                 pos += 9;
             }
             break;
@@ -554,11 +533,30 @@ void disassemble_tokens(const uint8_t *tokens, int len)
             break;
         }
 
-        printf("\n");
+        fprintf(file, "\n");
     }
 
     if (pos < end && *pos == T_EOL)
     {
-        printf("  %02X %s\n", T_EOL, token_name(T_EOL));
+        fprintf(file, "  %02X %s\n", T_EOL, token_name(T_EOL));
+    }
+}
+
+/* Disassemble a single line (debug dump) */
+static void dump_line(FILE *file, uint8_t *line_ptr)
+{
+    fprintf(file, "Line %d (len=%d):\n", get_line(line_ptr), get_len(line_ptr));
+    int token_len = get_len(line_ptr) - 5; /* Subtract header and T_EOL */
+    dump_tokens(file, get_tokens(line_ptr), token_len);
+    fprintf(file, "\n");
+}
+
+/* Disassemble program (debug dump) */
+void cmd_dump(FILE *file)
+{
+    printf("Program dump:\n");
+    for (uint8_t *line_ptr = program_first_line(); get_len(line_ptr) != 0; line_ptr += get_len(line_ptr))
+    {
+        dump_line(file, line_ptr);
     }
 }

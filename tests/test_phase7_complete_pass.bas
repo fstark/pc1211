@@ -1,9 +1,5 @@
 10 REM Phase 7 Complete Test
-20 REM Test AREAD (must be first!)
-30 AREAD A
-40 PRINT "AREAD captured:", A
-50 REM
-60 REM Test angle modes
+20 REM Test angle modes
 70 PRINT "Testing angle modes..."
 80 RADIAN
 90 PRINT "RADIAN: SIN(", 3.14159/2, ")=", SIN(3.14159/2)
@@ -28,10 +24,8 @@
 280 REM
 290 REM Test device commands
 300 PRINT "Testing BEEP..."
-310 BEEP
+310 BEEP 1
 320 PAUSE "Pausing for 100ms...", 123
-330 AREAD C
-340 PRINT "AREAD after PAUSE:", C, " (should be 0)"
 350 USING
 360 PRINT "Phase 7 implementation complete!"
 400 PRINT "PASS: PHASE 7 COMPLETE"

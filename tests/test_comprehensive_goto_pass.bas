@@ -20,7 +20,7 @@
 310 PRINT
 320 PRINT "4. Expression GOSUB:"
 330 X = 400
-340 GOSUB X + 50
+340 GOSUB X + 80
 350 PRINT "   Back from expression GOSUB"
 360 PRINT
 370 PRINT "5. String literal GOSUB:"

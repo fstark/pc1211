@@ -61,16 +61,12 @@ typedef enum
 typedef struct
 {
     bool running;              /* VM running state */
+    bool user_interrupted;     /* Flag set by Ctrl-C signal handler */
     uint8_t *pc;               /* Program counter (token pointer) */
     uint8_t *current_line_ptr; /* Current line pointer */
     ExprStack expr_stack;      /* Expression evaluation stack */
     CallStack call_stack;      /* GOSUB/RETURN call stack */
     ForStack for_stack;        /* FOR/NEXT loop stack */
-
-    /* AREAD state */
-    char aread_string[8]; /* AREAD string value */
-    double aread_value;   /* AREAD numeric value */
-    bool aread_is_string; /* Whether AREAD value is a string */
 
     /* Modes */
     AngleMode angle_mode; /* Trigonometric angle mode */
@@ -82,9 +78,16 @@ void vm_run(void);
 void vm_step(void);
 void vm_halt(void);
 
+void vm_start_program(void);
+
 /* Error handling */
 void vm_error_set(ErrorCode code);
 void vm_error_if(bool condition, ErrorCode code);
+
+/* User interruption handling */
+void vm_set_user_interrupted(void);
+void vm_clear_user_interrupted(void);
+void vm_check_user_interrupted(void); /* Checks flag and raises error if set */
 
 /* Expression evaluation */
 double vm_eval_expression_auto(uint8_t **pc_ptr); /* Token-aware, no boundaries */

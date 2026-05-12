@@ -78,7 +78,6 @@ typedef enum
     T_CLEAR = 0x53,  /* CLEAR (CL.) */
     T_BEEP = 0x54,   /* BEEP (B.) */
     T_PAUSE = 0x55,  /* PAUSE (PA.) */
-    T_AREAD = 0x56,  /* AREAD (A.) */
     T_USING = 0x57   /* USING (U.) */
 } Tok;
 
@@ -111,6 +110,7 @@ typedef enum
     ERR_FOR_STEP_ZERO = 6,
     ERR_RETURN_WITHOUT_GOSUB = 7,
     ERR_NEXT_WITHOUT_FOR = 8,
+    ERR_USER_INTERRUPTED = 9, /* Ctrl-C pressed */
 
     /* Type 2 errors (structural) */
     ERR_TYPE2_BASE = 10,
