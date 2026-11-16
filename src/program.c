@@ -2,10 +2,39 @@
 #include "errors.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 
 /* Global program state */
 Program g_program;
+
+/* Source line storage for error messages */
+#define SOURCE_LINE_MAX 256
+static char *g_source_lines[LINE_NUM_MAX + 1]; /* indexed by line number */
+
+void program_store_source(uint16_t line_num, const char *source)
+{
+    if (line_num > LINE_NUM_MAX)
+        return;
+    free(g_source_lines[line_num]);
+    g_source_lines[line_num] = strdup(source);
+}
+
+const char *program_get_source(uint16_t line_num)
+{
+    if (line_num > LINE_NUM_MAX)
+        return NULL;
+    return g_source_lines[line_num];
+}
+
+void program_clear_sources(void)
+{
+    for (int i = 0; i <= LINE_NUM_MAX; i++)
+    {
+        free(g_source_lines[i]);
+        g_source_lines[i] = NULL;
+    }
+}
 
 /* Initialize program memory */
 void program_init(void)
@@ -23,12 +52,13 @@ void program_clear(void)
     g_program.prog[2] = 0xff;
     g_program.prog[3] = 0xff;
     var_init_all();
+    program_clear_sources();
 }
 
 /* Initialize all variables to NUM=0, STR="" */
 void var_init_all(void)
 {
-    for (int i = 1; i <= VARS_MAX; i++)
+    for (int i = 0; i < VARS_MAX; i++)
     {
         g_program.vars[i].type = VAR_NUM;
         g_program.vars[i].value.num = 0.0;
@@ -91,15 +121,15 @@ bool program_add_line(uint16_t line_num, const uint8_t *tokens, int token_len)
     /* Calculate total record size */
     int record_len = 4 + token_len + 1; /* len + line + tokens + T_EOL */
 
-    /* Check if program would be too large */
+    /* Remove existing line if present */
+    program_delete_line(line_num);
+
+    /* Check if program would be too large (after deletion to avoid false rejects) */
     if (g_program.prog_len + record_len > PROG_MAX_BYTES)
     {
         error_report(ERR_PROGRAM_TOO_LARGE, line_num);
         return false;
     }
-
-    /* Remove existing line if present */
-    program_delete_line(line_num);
 
     /* Find insertion point (maintain line number order) */
     uint8_t *insert_pos = program_find_first_line_after(line_num);
@@ -160,7 +190,14 @@ static bool program_match_label(uint8_t *line_ptr, const char *label)
         return false;
     uint8_t len = tokens[1];
 
-    return strncmp((const char *)(tokens + 2), label, len) == 0;
+    /* Labels are compared using only the first 7 characters (STR_MAX) */
+    uint8_t cmp_len = len > STR_MAX ? STR_MAX : len;
+    size_t label_len = strlen(label);
+    uint8_t label_cmp = label_len > STR_MAX ? STR_MAX : (uint8_t)label_len;
+
+    if (cmp_len != label_cmp)
+        return false;
+    return strncmp((const char *)(tokens + 2), label, cmp_len) == 0;
 }
 
 /* Find line number for a label */
@@ -219,16 +256,7 @@ void program_validate_line_ptr(uint8_t *line_ptr)
     /* Must be within program bounds, but allow terminator position */
     assert(g_program.prog <= line_ptr && line_ptr <= g_program.prog + g_program.prog_len);
 
-    /* Must be at a valid line boundary (len field exists and is reasonable) */
-    if (!(line_ptr + sizeof(uint16_t) <= g_program.prog + g_program.prog_len))
-        printf("%p + %d (=%p) > %p + %d (=%p)\n",
-               (void *)line_ptr,
-               (int)sizeof(uint16_t),
-               (void *)(line_ptr + sizeof(uint16_t)),
-               (void *)g_program.prog,
-               g_program.prog_len,
-               (void *)(g_program.prog + g_program.prog_len));
-
+    /* Check line length */
     uint16_t len = get_len(line_ptr);
     if (len == 0)
         return; /* End marker is valid */
@@ -294,7 +322,6 @@ uint8_t *token_skip(uint8_t *token)
 
     case T_VAR:
     case T_SVAR:
-    case T_THEN:        /* THEN followed by u16 line number */
         token += 1 + 1; /* opcode + 1 byte data */
         break;
 

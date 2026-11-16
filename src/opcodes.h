@@ -96,30 +96,45 @@ enum
     LABELS_MAX = 100       /* Maximum number of labels */
 };
 
-/* Error codes */
+/* Error codes — matches PC-1211 manual [p.77]
+ * 1 = Grammatical/Operational/Type error
+ * 2 = Line error (GOTO/GOSUB to non-existent line or label)
+ * 3 = Depth error (stack overflow, RETURN without GOSUB, NEXT without FOR)
+ * 4 = Step-over error (index out of range, program too large)
+ * 5 = Cassette error (not implemented)
+ * 6 = Format error (USING)
+ */
 typedef enum
 {
     ERR_NONE = 0,
-    /* Type 1 errors (runtime) */
-    ERR_TYPE1_BASE = 1,
-    ERR_DIVISION_BY_ZERO = 1,
-    ERR_MATH_DOMAIN = 2, /* SQR(-1), LOG(0), etc. */
-    ERR_MATH_OVERFLOW = 3,
-    ERR_INDEX_OUT_OF_RANGE = 4, /* A(n) with n<1 or n>VARS_MAX */
-    ERR_TYPE_MISMATCH = 5,      /* Mixed string/number comparison */
-    ERR_FOR_STEP_ZERO = 6,
-    ERR_RETURN_WITHOUT_GOSUB = 7,
-    ERR_NEXT_WITHOUT_FOR = 8,
-    ERR_USER_INTERRUPTED = 9, /* Ctrl-C pressed */
 
-    /* Type 2 errors (structural) */
-    ERR_TYPE2_BASE = 10,
-    ERR_BAD_LINE_NUMBER = 10, /* GOTO to non-existent line */
-    ERR_SYNTAX_ERROR = 11,
-    ERR_LINE_TOO_LONG = 12,
-    ERR_PROGRAM_TOO_LARGE = 13,
-    ERR_STACK_OVERFLOW = 14,
-    ERR_LABEL_NOT_FOUND = 15 /* GOTO/GOSUB to non-existent label */
+    /* Error 1: Grammatical / Operational / Type */
+    ERR_DIVISION_BY_ZERO = 1,
+    ERR_MATH_DOMAIN = 1,
+    ERR_MATH_OVERFLOW = 1,
+    ERR_TYPE_MISMATCH = 1,
+    ERR_FOR_STEP_ZERO = 1,
+    ERR_SYNTAX_ERROR = 1,
+
+    /* Error 2: Line error */
+    ERR_BAD_LINE_NUMBER = 2,
+    ERR_LABEL_NOT_FOUND = 2,
+
+    /* Error 3: Depth error */
+    ERR_RETURN_WITHOUT_GOSUB = 3,
+    ERR_NEXT_WITHOUT_FOR = 3,
+    ERR_STACK_OVERFLOW = 3,
+
+    /* Error 4: Step-over / Memory error */
+    ERR_INDEX_OUT_OF_RANGE = 4,
+    ERR_LINE_TOO_LONG = 4,
+    ERR_PROGRAM_TOO_LARGE = 4,
+
+    /* Error 6: Format error */
+    ERR_FORMAT = 6,
+
+    /* Special: not a PC-1211 error code */
+    ERR_USER_INTERRUPTED = 99
 } ErrorCode;
 
 #endif /* OPCODES_H */

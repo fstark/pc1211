@@ -26,6 +26,12 @@ ErrorCode error_get_code(void);
 void error_clear(void);
 void error_print(void);
 
+/* Source context for error display */
+void error_set_source(const char *full_line, int content_offset);
+void error_clear_source(void);
+void error_set_pos(int pos);
+void error_set_token_offset(int offset);
+
 /* Global jump buffer for error handling */
 extern jmp_buf g_error_jump_buf;
 

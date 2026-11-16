@@ -13,7 +13,7 @@ typedef struct
 } VMPosition;
 
 /* Expression evaluation stack */
-#define EXPR_STACK_SIZE 32
+#define EXPR_STACK_SIZE 8
 typedef struct
 {
     double values[EXPR_STACK_SIZE];
@@ -21,7 +21,7 @@ typedef struct
 } ExprStack;
 
 /* GOSUB/RETURN call stack */
-#define CALL_STACK_SIZE 16
+#define CALL_STACK_SIZE 4
 typedef struct
 {
     VMPosition return_pos; /* Where to return to */
@@ -34,7 +34,7 @@ typedef struct
 } CallStack;
 
 /* FOR/NEXT loop stack */
-#define FOR_STACK_SIZE 16
+#define FOR_STACK_SIZE 4
 typedef struct
 {
     VMPosition body; /* Position after the FOR statement */

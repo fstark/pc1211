@@ -715,19 +715,13 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         if (!eval_string_expression(pc_ptr, left_str))
             return false;
 
-        /* Get comparison operator - only = and <> supported for strings */
+        /* Check for comparison operator - if none, IF form 4: non-empty check */
         if (*pc_ptr >= end)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return false;
-        }
+            return left_str[0] != '\0';
 
         uint8_t op = **pc_ptr;
         if (op != T_EQ && op != T_EQ_ASSIGN && op != T_NE)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return false;
-        }
+            return left_str[0] != '\0';
         (*pc_ptr)++;
 
         /* Evaluate right string */
@@ -756,14 +750,17 @@ bool vm_eval_condition(uint8_t **pc_ptr, uint8_t *end)
         if (error_get_code() != ERR_NONE)
             return false;
 
-        /* Get comparison operator */
+        /* Check for comparison operator - if none, IF form 2: expr > 0 is true */
         if (*pc_ptr >= end)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return false;
-        }
+            return left_val > 0;
 
         uint8_t op = **pc_ptr;
+
+        /* If not a relational operator, treat as boolean (IF form 2) */
+        if (op != T_EQ && op != T_EQ_ASSIGN && op != T_NE &&
+            op != T_LT && op != T_LE && op != T_GT && op != T_GE)
+            return left_val > 0;
+
         (*pc_ptr)++;
 
         /* Parse right side of comparison */
@@ -1077,75 +1074,93 @@ static void execute_svidx_assign(void)
 
 static void execute_let(void)
 {
-    /* Handle assignment with explicit LET: LET VAR = expr or LET VAR(expr) = expr */
-    uint8_t next_token = *g_vm.pc;
-
-    if (next_token == T_VAR)
+    /* Handle assignment with explicit LET, with multi-assign support:
+       LET A=2, B=7, C$="TEST" */
+    for (;;)
     {
-        g_vm.pc++;
-        uint8_t var_idx = *g_vm.pc++;
+        uint8_t next_token = *g_vm.pc;
 
-        /* Expect = */
-        if (*g_vm.pc != T_EQ_ASSIGN)
+        if (next_token == T_VAR)
         {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return;
-        }
-        g_vm.pc++;
+            g_vm.pc++;
+            uint8_t var_idx = *g_vm.pc++;
 
-        /* Evaluate right-hand side */
-        double value = vm_eval_expression_auto(&g_vm.pc);
-
-        if (error_get_code() != ERR_NONE)
-            return;
-
-        /* Store in variable */
-        if (var_idx < 1 || var_idx > 26)
-        { /* A-Z variables only */
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[var_idx - 1];
-        cell->type = VAR_NUM;
-        cell->value.num = value;
-    }
-    else if (next_token == T_VIDX)
-    {
-        g_vm.pc++; /* Skip T_VIDX */
-
-        /* Evaluate index */
-        double index_val = vm_eval_expression_auto(&g_vm.pc);
-
-        /* Skip T_ENDX */
-        if (*g_vm.pc == T_ENDX)
+            if (*g_vm.pc != T_EQ_ASSIGN)
+            {
+                vm_error_set(ERR_SYNTAX_ERROR);
+                return;
+            }
             g_vm.pc++;
 
-        /* Expect = */
-        if (*g_vm.pc != T_EQ_ASSIGN)
+            double value = vm_eval_expression_auto(&g_vm.pc);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            if (var_idx < 1 || var_idx > 26)
+            {
+                vm_error_set(ERR_INDEX_OUT_OF_RANGE);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[var_idx - 1];
+            cell->type = VAR_NUM;
+            cell->value.num = value;
+        }
+        else if (next_token == T_VIDX)
+        {
+            g_vm.pc++;
+
+            double index_val = vm_eval_expression_auto(&g_vm.pc);
+
+            if (*g_vm.pc == T_ENDX)
+                g_vm.pc++;
+
+            if (*g_vm.pc != T_EQ_ASSIGN)
+            {
+                vm_error_set(ERR_SYNTAX_ERROR);
+                return;
+            }
+            g_vm.pc++;
+
+            double value = vm_eval_expression_auto(&g_vm.pc);
+            if (error_get_code() != ERR_NONE)
+                return;
+
+            int index = (int)index_val;
+            if (index < 1 || index > VARS_MAX)
+            {
+                vm_error_set(ERR_INDEX_OUT_OF_RANGE);
+                return;
+            }
+
+            VarCell *cell = &g_program.vars[index - 1];
+            cell->type = VAR_NUM;
+            cell->value.num = value;
+        }
+        else if (next_token == T_SVAR)
+        {
+            g_vm.pc++;
+            execute_svar_assign();
+            if (error_get_code() != ERR_NONE)
+                return;
+        }
+        else if (next_token == T_SVIDX)
+        {
+            g_vm.pc++;
+            execute_svidx_assign();
+            if (error_get_code() != ERR_NONE)
+                return;
+        }
+        else
         {
             vm_error_set(ERR_SYNTAX_ERROR);
             return;
         }
-        g_vm.pc++;
 
-        /* Evaluate right-hand side */
-        double value = vm_eval_expression_auto(&g_vm.pc);
-
-        if (error_get_code() != ERR_NONE)
-            return;
-
-        /* Store in indexed variable */
-        int index = (int)index_val;
-        if (index < 1 || index > VARS_MAX)
-        {
-            vm_error_set(ERR_INDEX_OUT_OF_RANGE);
-            return;
-        }
-
-        VarCell *cell = &g_program.vars[index - 1];
-        cell->type = VAR_NUM;
-        cell->value.num = value;
+        /* Check for comma (multi-assignment) */
+        if (*g_vm.pc != T_COMMA)
+            break;
+        g_vm.pc++; /* Skip comma */
     }
 }
 
@@ -1250,11 +1265,6 @@ static void execute_goto(void)
         /* String literal label */
         g_vm.pc++; /* Skip T_STR */
         uint8_t str_len = *g_vm.pc++;
-        if (str_len > STR_MAX)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return;
-        }
         char label[STR_MAX + 1];
         memcpy(label, g_vm.pc, str_len);
         label[str_len] = '\0';
@@ -1313,11 +1323,6 @@ static void execute_gosub(void)
         /* String literal label */
         g_vm.pc++; /* Skip T_STR */
         uint8_t str_len = *g_vm.pc++;
-        if (str_len > STR_MAX)
-        {
-            vm_error_set(ERR_SYNTAX_ERROR);
-            return;
-        }
         char label[STR_MAX + 1];
         memcpy(label, g_vm.pc, str_len);
         label[str_len] = '\0';

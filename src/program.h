@@ -52,6 +52,11 @@ extern Program g_program;
 void program_init(void);
 void program_clear(void);
 
+/* Source line storage for error messages */
+void program_store_source(uint16_t line_num, const char *source);
+const char *program_get_source(uint16_t line_num);
+void program_clear_sources(void);
+
 /* Line management */
 bool program_add_line(uint16_t line_num, const uint8_t *tokens, int token_len);
 bool program_delete_line(uint16_t line_num);
